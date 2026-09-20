@@ -1,0 +1,63 @@
+﻿# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+out/
+release/
+*.exe
+*.msi
+*.dmg
+*.pkg
+*.blockmap
+*.zip
+*.tar.gz
+*.tar.xz
+*.appx
+*.ezi
+
+# Electron packaging
+**/node_modules/*
+!**/node_modules/**/package.json
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local database and runtime data
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+**/data/*.db
+**/data/*.sqlite
+**/data/*.sqlite3
+**/data/*.db-shm
+**/data/*.db-wal
+
+# Operational artifacts
+log/
+logs/
+coverage/
+*.log
+
+# IDE and OS files
+.vscode/
+.idea/*
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

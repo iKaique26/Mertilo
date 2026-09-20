@@ -1,0 +1,113 @@
+openapi: 3.0.0
+info:
+  title: Mertilo API
+  version: 2.0.0
+  description: API local para gestão de finanças pessoais.
+servers:
+  - url: http://localhost:5000
+paths:
+  /api/health:
+    get:
+      summary: Verifica a disponibilidade da API
+      responses: { '200': { description: API disponível } }
+  /api/financas:
+    get:
+      summary: Retorna todos os dados financeiros
+      responses: { '200': { description: Dados financeiros } }
+  /api/financas/salario:
+    get:
+      summary: Consulta o salário atual
+      responses: { '200': { description: Salário atual } }
+    put:
+      summary: Atualiza o salário atual
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [salario], properties: { salario: { type: number, minimum: 0 } } }
+      responses: { '200': { description: Salário atualizado } }
+  /api/financas/contas:
+    get:
+      summary: Lista contas
+      responses: { '200': { description: Lista de contas } }
+    post:
+      summary: Cria uma conta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContaInput' }
+      responses: { '201': { description: Conta criada } }
+  /api/financas/contas/{id}:
+    put:
+      summary: Atualiza uma conta
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '200': { description: Conta atualizada }, '404': { description: Conta não encontrada } }
+    delete:
+      summary: Remove uma conta
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '204': { description: Conta removida }, '404': { description: Conta não encontrada } }
+  /api/categories:
+    get:
+      summary: Lista categorias
+      responses: { '200': { description: Lista de categorias } }
+    post:
+      summary: Cria uma categoria
+      responses: { '201': { description: Categoria criada } }
+  /api/categories/{id}:
+    put:
+      summary: Atualiza uma categoria
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '200': { description: Categoria atualizada } }
+    delete:
+      summary: Remove uma categoria
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '204': { description: Categoria removida } }
+  /api/financas/historico:
+    get:
+      summary: Lista resumos mensais
+      responses: { '200': { description: Histórico financeiro } }
+    post:
+      summary: Cria um resumo mensal
+      responses: { '201': { description: Resumo criado } }
+  /api/financas/historico/{id}:
+    put:
+      summary: Atualiza um resumo mensal
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '200': { description: Resumo atualizado } }
+    delete:
+      summary: Remove um resumo mensal
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '204': { description: Resumo removido } }
+  /api/vexpenses/historico:
+    get:
+      summary: Lista despesas de veículo
+      responses: { '200': { description: Histórico de veículo } }
+    post:
+      summary: Cria uma despesa de veículo
+      responses: { '201': { description: Registro criado } }
+  /api/vexpenses/historico/{id}:
+    put:
+      summary: Atualiza uma despesa de veículo
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '200': { description: Registro atualizado } }
+    delete:
+      summary: Remove uma despesa de veículo
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '204': { description: Registro removido } }
+components:
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema: { type: string }
+  schemas:
+    ContaInput:
+      type: object
+      required: [nome, valor]
+      properties:
+        nome: { type: string }
+        valor: { type: number, minimum: 0 }
+        categoria: { type: string }
+        isFixed: { type: boolean }

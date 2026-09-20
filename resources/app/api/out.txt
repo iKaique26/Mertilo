@@ -1,0 +1,53 @@
+[2026-09-13T14:20:49.152Z] INFO 🔄 Inicializando database...
+[2026-09-13T14:20:49.158Z] INFO Database conectado: C:\Users\kaiqu\OneDrive\Desktop\Mertilo\resources\app\api\data\debug-auth-case.db
+[2026-09-13T14:20:49.158Z] INFO 🔄 Iniciando migrations...
+[2026-09-13T14:20:49.160Z] INFO 📋 5 migration(s) pendente(s)
+[2026-09-13T14:20:49.161Z] INFO ✅ Migration executada: 001_initial_schema
+[2026-09-13T14:20:49.161Z] INFO ✅ Migration executada: 002_indexes
+[2026-09-13T14:20:49.164Z] INFO ✅ Migration executada: 003_irpf_schema
+[2026-09-13T14:20:49.164Z] INFO ✅ Migration executada: 004_irpf_review_center
+[2026-09-13T14:20:49.167Z] INFO ✅ Migration executada: 010_users_meta_investments
+[2026-09-13T14:20:49.169Z] INFO ✅ Todas as migrations executadas com sucesso
+[2026-09-13T14:20:49.169Z] INFO 🚀 Iniciando migração JSON → SQLite
+[2026-09-13T14:20:49.170Z] INFO 📊 Dados no JSON:
+[2026-09-13T14:20:49.170Z] INFO   - Categorias: 5
+[2026-09-13T14:20:49.170Z] INFO   - Contas: 5
+[2026-09-13T14:20:49.170Z] INFO   - Histórico: 0
+[2026-09-13T14:20:49.170Z] INFO   - Despesas Veículo: 0
+[2026-09-13T14:20:49.170Z] INFO   - Salário: não
+[2026-09-13T14:20:49.171Z] INFO ✅ Dados migrados para SQLite:
+[2026-09-13T14:20:49.172Z] INFO   - Categorias: 5 → 5
+[2026-09-13T14:20:49.172Z] INFO   - Contas: 5 → 5
+[2026-09-13T14:20:49.172Z] INFO   - Histórico: 0 → 0
+[2026-09-13T14:20:49.172Z] INFO   - Despesas Veículo: 0 → 0
+[2026-09-13T14:20:49.172Z] INFO   - Salário: não
+[2026-09-13T14:20:49.172Z] INFO ✅ Validação de integridade: PASSED
+[2026-09-13T14:20:49.172Z] INFO 🎉 Migração JSON → SQLite concluída com sucesso!
+[2026-09-13T14:20:49.173Z] INFO ✅ Database inicializado com sucesso
+[2026-09-13T14:20:49.173Z] INFO SMTP configurado e pronto para envio real de e-mails.
+[2026-09-13T14:20:49.177Z] INFO ✅ Servidor rodando em http://127.0.0.1:6004
+[2026-09-13T14:20:49.177Z] INFO 📚 Documentação: http://localhost:6004/api-docs
+[2026-09-13T14:20:52.038Z] INFO POST /api/auth/register
+[2026-09-13T14:20:52.039Z] INFO [EMAIL] register requested { email: 'te***@example.com', name: 'User' }
+[2026-09-13T14:20:52.094Z] INFO [EMAIL] verification code generated { userId: '1789309252094', email: 'te***@example.com' }
+[2026-09-13T14:20:52.146Z] INFO [EMAIL] verification code persisted {
+  userId: '1789309252094',
+  email: 'te***@example.com',
+  expiresAt: '2026-09-13T15:20:52.145Z'
+}
+[2026-09-13T14:20:52.146Z] INFO [EMAIL] email service called { userId: '1789309252094', email: 'te***@example.com' }
+[2026-09-13T14:20:52.147Z] INFO [EMAIL] provider selected {
+  provider: 'MockEmailProvider',
+  recipient: 'te***@example.com',
+  sender: 'configured',
+  subject: 'Confirme seu e-mail — Mertilo'
+}
+[2026-09-13T14:20:52.147Z] INFO [EMAIL] provider accepted message {
+  provider: 'mock',
+  recipient: 'te***@example.com',
+  messageId: 'mock-1789309252147'
+}
+[2026-09-13T14:20:52.147Z] INFO [EMAIL] email service returned { userId: '1789309252094', email: 'te***@example.com' }
+[0mPOST /api/auth/register [32m201[0m 110.833 ms - 134[0m
+[2026-09-13T14:20:54.523Z] INFO POST /api/auth/verify-email
+[0mPOST /api/auth/verify-email [32m200[0m 53.925 ms - 272[0m

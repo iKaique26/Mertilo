@@ -1,0 +1,25 @@
+EMPRESA: Acme Corporation
+CPF: 123.456.789-00
+CNPJ: 12.345.678/0001-99
+
+CONTRACHEQUE - MÊS: 09/2024
+
+COMPETÊNCIA: 09/2024
+DATA: 05/10/2024
+
+SALÁRIO BRUTO: R$ 5.000,00
+INSS: R$ 550,00
+IRRF: R$ 275,00
+FGTS: R$ 400,00
+SALÁRIO LÍQUIDO: R$ 3.775,00
+
+DESCONTOS:
+- Vale Transporte: R$ 220,00
+- Vale Alimentação: R$ 350,00
+
+ADICIONAIS:
+- Bônus: R$ 500,00
+- Décimo Terceiro: R$ 416,67
+
+Assinado digitalmente
+Data: 05/10/2024

@@ -1,0 +1,37 @@
+{
+  "name": "mertilo",
+  "version": "1.0.0",
+  "main": "electron/main.cjs",
+  "description": "Aplicativo de finanças pessoais Mertilo",
+  "author": "",
+  "type": "module",
+  "dependencies": {
+    "lucide-react": "^1.41.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.3"
+  },
+  "optionalDependencies": {
+    "electron": "^26.6.10"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "dev:electron": "concurrently -k \"npm run dev\" \"electron .\" --env ELECTRON_START_URL=http://127.0.0.1:5173",
+    "build": "vite build --outDir ../dist",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "preview:5173": "vite preview --host 127.0.0.1 --port 5173",
+    "start": "npm run build && electron .",
+    "lint": "eslint . --ext .js --ext .jsx",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.0.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "concurrently": "^8.2.2",
+    "eslint": "^10.7.0",
+    "jsdom": "^25.0.1",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.8"
+  }
+}

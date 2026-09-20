@@ -1,0 +1,32 @@
+[
+  {
+    "id": "1",
+    "nome": "Moradia",
+    "cor": "#7C3AED",
+    "percentual": 0.3
+  },
+  {
+    "id": "2",
+    "nome": "Alimentação",
+    "cor": "#6366F1",
+    "percentual": 0.15
+  },
+  {
+    "id": "3",
+    "nome": "Transporte",
+    "cor": "#001F54",
+    "percentual": 0.1
+  },
+  {
+    "id": "4",
+    "nome": "Saúde",
+    "cor": "#10B981",
+    "percentual": 0.1
+  },
+  {
+    "id": "5",
+    "nome": "Educação",
+    "cor": "#F59E0B",
+    "percentual": 0.05
+  }
+]
