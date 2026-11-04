@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger.js';
-import { MockEmailProvider, ResendEmailProvider, SmtpEmailProvider, type EmailMessage, type EmailProvider } from './email-provider.js';
+import { BrevoApiEmailProvider, MockEmailProvider, SmtpEmailProvider, type EmailMessage, type EmailProvider } from './email-provider.js';
 
 function maskEmail(email: string) {
   const normalized = (email ?? '').trim();
@@ -13,6 +13,11 @@ function getStringEnv(name: string) {
   return (process.env[name] ?? '').trim();
 }
 
+function getBooleanEnv(name: string) {
+  const value = (process.env[name] ?? '').trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(value);
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -22,20 +27,68 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;');
 }
 
-function getProvider(): EmailProvider {
-  if (process.env.NODE_ENV === 'test') return new MockEmailProvider();
+function isBrevoApiConfigured() {
+  const apiKey = getStringEnv('BREVO_API_KEY');
+  const sender = getStringEnv('SMTP_FROM') || getStringEnv('SMTP_FROM_EMAIL');
+  return Boolean(apiKey && sender);
+}
 
+function isSmtpConfigured() {
   const smtpHost = getStringEnv('SMTP_HOST');
   const smtpUser = getStringEnv('SMTP_USER') || getStringEnv('SMTP_USERNAME');
   const smtpPass = getStringEnv('SMTP_PASS') || getStringEnv('SMTP_PASSWORD');
   const smtpFrom = getStringEnv('SMTP_FROM') || getStringEnv('SMTP_FROM_EMAIL');
-  if (smtpHost && smtpUser && smtpPass && smtpFrom) return new SmtpEmailProvider();
+  return Boolean(smtpHost && smtpUser && smtpPass && smtpFrom);
+}
 
-  const resendKey = getStringEnv('RESEND_API_KEY');
-  const resendFrom = getStringEnv('RESEND_FROM_EMAIL');
-  if (resendKey && resendFrom) return new ResendEmailProvider();
+function getProviderPreference(): 'auto' | 'brevo-api' | 'smtp' | 'mock' {
+  const value = (process.env.EMAIL_PROVIDER ?? 'auto').trim().toLowerCase();
+  if (value === 'brevo-api' || value === 'brevoapi') return 'brevo-api';
+  if (value === 'smtp') return 'smtp';
+  if (value === 'mock') return 'mock';
+  return 'auto';
+}
 
-  return new MockEmailProvider();
+function isFallbackToSmtpEnabled() {
+  return getBooleanEnv('EMAIL_FALLBACK_TO_SMTP');
+}
+
+function getProviderChain(): EmailProvider[] {
+  if (process.env.NODE_ENV === 'test') return [new MockEmailProvider()];
+
+  const preferred = getProviderPreference();
+  const providers: EmailProvider[] = [];
+
+  if (preferred === 'mock') return [new MockEmailProvider()];
+
+  if (preferred === 'brevo-api') {
+    if (isBrevoApiConfigured()) return [new BrevoApiEmailProvider()];
+    throw new Error('Configuração da API Brevo incompleta. Defina BREVO_API_KEY e SMTP_FROM antes de enviar e-mails.');
+  }
+
+  if (preferred === 'smtp') {
+    if (isSmtpConfigured()) return [new SmtpEmailProvider()];
+    throw new Error('Configuração SMTP do Brevo incompleta. Defina SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM antes de enviar e-mails.');
+  }
+
+  if (isBrevoApiConfigured()) providers.push(new BrevoApiEmailProvider());
+  if (isSmtpConfigured()) providers.push(new SmtpEmailProvider());
+
+  if (providers.length === 0) {
+    throw new Error('Nenhum provedor de e-mail configurado. Defina BREVO_API_KEY ou SMTP_HOST/SMTP_USER/SMTP_PASS/SMTP_FROM.');
+  }
+
+  return providers;
+}
+
+function shouldTryFallbackToSmtp(primaryProvider: EmailProvider, error: unknown): boolean {
+  if (!isFallbackToSmtpEnabled() || !isSmtpConfigured()) return false;
+  if (!(primaryProvider instanceof BrevoApiEmailProvider)) return false;
+
+  const reason = error instanceof Error ? error.message : String(error);
+  const message = reason.toLowerCase();
+  if (message.includes('accepted') || message.includes('already sent') || message.includes('duplicate')) return false;
+  return true;
 }
 
 export function buildVerificationEmail(code: string, expiresInMinutes = 60) {
@@ -102,57 +155,55 @@ export function buildPasswordResetEmail(link: string) {
 
 export const emailService = {
   isConfigured() {
-    const smtpHost = getStringEnv('SMTP_HOST');
-    const smtpUser = getStringEnv('SMTP_USER') || getStringEnv('SMTP_USERNAME');
-    const smtpPass = getStringEnv('SMTP_PASS') || getStringEnv('SMTP_PASSWORD');
-    const smtpFrom = getStringEnv('SMTP_FROM') || getStringEnv('SMTP_FROM_EMAIL');
-    const smtpConfigured = Boolean(smtpHost && smtpUser && smtpPass && smtpFrom);
-
-    if (smtpConfigured) return true;
-
-    const resendKey = getStringEnv('RESEND_API_KEY');
-    const resendFrom = getStringEnv('RESEND_FROM_EMAIL');
-    return Boolean(resendKey && resendFrom);
+    return isBrevoApiConfigured() || isSmtpConfigured();
   },
 
   logConfigurationStatus() {
-    const smtpHost = getStringEnv('SMTP_HOST');
-    const smtpUser = getStringEnv('SMTP_USER') || getStringEnv('SMTP_USERNAME');
-    const smtpPass = getStringEnv('SMTP_PASS') || getStringEnv('SMTP_PASSWORD');
-    const smtpFrom = getStringEnv('SMTP_FROM') || getStringEnv('SMTP_FROM_EMAIL');
-
-    if (smtpHost && smtpUser && smtpPass && smtpFrom) {
-      logger.info('SMTP configurado e pronto para envio real de e-mails.');
+    if (isBrevoApiConfigured()) {
+      logger.info('API do Brevo configurada e pronta para envio real de e-mails.');
       return;
     }
 
-    if (getStringEnv('RESEND_API_KEY') && getStringEnv('RESEND_FROM_EMAIL')) {
-      logger.info('Resend configurado e pronto para envio real de e-mails.');
+    if (isSmtpConfigured()) {
+      logger.info('SMTP do Brevo configurado e pronto para envio real de e-mails.');
       return;
     }
 
-    logger.info('Nenhum provedor de e-mail configurado.');
+    logger.warn('Configuração de e-mail do Brevo incompleta. Defina BREVO_API_KEY ou SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM antes de enviar e-mails.');
   },
 
   async sendMail(to: string, subject: string, text: string, html?: string) {
-    const provider = getProvider();
+    const providers = getProviderChain();
     const message: EmailMessage = { to, subject, text, html };
-    const providerName = provider.constructor.name;
-    const smtpConfigured = Boolean(
-      (getStringEnv('SMTP_HOST') && (getStringEnv('SMTP_USER') || getStringEnv('SMTP_USERNAME')) && (getStringEnv('SMTP_PASS') || getStringEnv('SMTP_PASSWORD')) && (getStringEnv('SMTP_FROM') || getStringEnv('SMTP_FROM_EMAIL')))
-    );
-    const senderConfigured = smtpConfigured || Boolean(getStringEnv('RESEND_API_KEY') && getStringEnv('RESEND_FROM_EMAIL'));
-    logger.info('[EMAIL] provider selected', { provider: providerName, recipient: maskEmail(to), sender: senderConfigured ? 'configured' : 'missing', subject });
+    let lastError: unknown = null;
 
-    try {
-      const result = await provider.send(message);
-      logger.info('[EMAIL] provider accepted message', { provider: result.provider, recipient: maskEmail(to), messageId: result.messageId ?? null });
-      return result;
-    } catch (error) {
-      const raw = error instanceof Error ? error.message : 'Erro ao enviar e-mail';
-      logger.warn('[EMAIL] provider error', { provider: providerName, recipient: maskEmail(to), subject, reason: raw });
-      throw new Error('Não foi possível enviar o e-mail no momento. Tente novamente.');
+    for (let index = 0; index < providers.length; index += 1) {
+      const provider = providers[index];
+      const providerName = provider.constructor.name;
+      const smtpConfigured = isSmtpConfigured();
+      logger.info('[EMAIL] provider selected', { provider: providerName, recipient: maskEmail(to), sender: smtpConfigured ? 'configured' : 'missing', subject });
+
+      try {
+        const result = await provider.send(message);
+        logger.info('[EMAIL] provider accepted message', { provider: result.provider, recipient: maskEmail(to), messageId: result.messageId ?? null });
+        return result;
+      } catch (error) {
+        lastError = error;
+        const raw = error instanceof Error ? error.message : 'Erro ao enviar e-mail';
+        logger.warn('[EMAIL] provider error', { provider: providerName, recipient: maskEmail(to), subject, reason: raw });
+
+        const canFallback = index === 0 && shouldTryFallbackToSmtp(provider, error) && providers.some((candidate) => candidate instanceof SmtpEmailProvider);
+        if (canFallback) {
+          logger.warn('[EMAIL] attempting fallback provider after primary failure', { primary: providerName, alternate: 'SmtpEmailProvider', recipient: maskEmail(to) });
+          continue;
+        }
+
+        throw error;
+      }
     }
+
+    const raw = lastError instanceof Error ? lastError.message : 'Erro ao enviar e-mail';
+    throw new Error(`Não foi possível enviar o e-mail no momento. Motivo do provedor: ${raw}`);
   },
 
   async sendVerificationCode(to: string, code: string, expiresInMinutes = 60) {

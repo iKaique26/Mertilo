@@ -19,6 +19,14 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: '3', nome: 'Transporte', cor: '#001F54', percentual: 0.1 },
   { id: '4', nome: 'Saúde', cor: '#10B981', percentual: 0.1 },
   { id: '5', nome: 'Educação', cor: '#F59E0B', percentual: 0.05 },
+  { id: '6', nome: 'Compras', cor: '#F97316', percentual: 0.08 },
+  { id: '7', nome: 'Assinaturas e serviços digitais', cor: '#EC4899', percentual: 0.06 },
+  { id: '8', nome: 'Lazer e entretenimento', cor: '#8B5CF6', percentual: 0.04 },
+  { id: '9', nome: 'Viagens', cor: '#14B8A6', percentual: 0.04 },
+  { id: '10', nome: 'Impostos', cor: '#F43F5E', percentual: 0.04 },
+  { id: '11', nome: 'Salário e outras receitas', cor: '#22C55E', percentual: 0.18 },
+  { id: '12', nome: 'Investimentos e aplicações', cor: '#0EA5E9', percentual: 0.05 },
+  { id: '13', nome: 'Não categorizado', cor: '#94A3B8', percentual: 0.05 },
 ];
 
 const defaultData = (): AppData => ({
@@ -27,6 +35,8 @@ const defaultData = (): AppData => ({
   categorias: DEFAULT_CATEGORIES,
   historico: [],
   vexpenses: [],
+  importHistory: [],
+  importedTransactions: [],
 });
 
 function normalizeData(value: Partial<AppData>): AppData {
@@ -37,6 +47,8 @@ function normalizeData(value: Partial<AppData>): AppData {
     categorias: Array.isArray(value.categorias) && value.categorias.length > 0 ? value.categorias : defaults.categorias,
     historico: Array.isArray(value.historico) ? value.historico : defaults.historico,
     vexpenses: Array.isArray(value.vexpenses) ? value.vexpenses : defaults.vexpenses,
+    importHistory: Array.isArray(value.importHistory) ? value.importHistory : defaults.importHistory,
+    importedTransactions: Array.isArray(value.importedTransactions) ? value.importedTransactions : defaults.importedTransactions,
   };
 }
 

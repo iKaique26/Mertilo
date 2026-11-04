@@ -3,6 +3,7 @@
  * Exibe todos os dados financeiros em um único painel
  */
 
+import { useEffect, useState } from 'react';
 import { useFinancial } from '../../hooks/useFinancial';
 import {
   Loading,
@@ -20,8 +21,108 @@ import {
 } from '../../components/dashboard';
 import { TrendingUp, PlusCircle } from 'lucide-react';
 
+const PERIOD_STORAGE_KEY = 'mertilo_selected_period';
+
+function getStoredPeriod() {
+  if (typeof window === 'undefined') return 'month';
+  return localStorage.getItem(PERIOD_STORAGE_KEY) || 'month';
+}
+
+function getPeriodLabel(period) {
+  switch (period) {
+    case 'quarter': return 'Últimos 3 meses';
+    case 'all': return 'Todo o período';
+    default: return 'Este mês';
+  }
+}
+
+function filterHistoryByPeriod(history, period) {
+  if (!Array.isArray(history) || history.length === 0) return [];
+
+  const safeEntries = history
+    .map((entry) => ({
+      ...entry,
+      monthKey: entry?.mes || entry?.data || entry?.criadoEm || '',
+    }))
+    .filter((entry) => entry.monthKey)
+    .sort((a, b) => String(a.monthKey).localeCompare(String(b.monthKey)));
+
+  if (period === 'quarter') {
+    return safeEntries.slice(-3);
+  }
+
+  if (period === 'all') {
+    return safeEntries;
+  }
+
+  return safeEntries.slice(-1);
+}
+
+function buildSavingsRecommendations({ salario, contas, categories, history }) {
+  const fixedExpenses = (contas || []).filter((item) => item.isFixed).reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+  const totalHistory = (history || []).reduce((sum, item) => sum + (Number(item.totalContas) || 0), 0);
+  const avgSpent = history && history.length ? totalHistory / history.length : fixedExpenses;
+  const highestCategory = (categories || []).reduce((best, category) => {
+    const value = Number(category.gasto || category.percentual || 0);
+    if (!best || value > best.value) {
+      return { name: category.nome, value };
+    }
+    return best;
+  }, null);
+
+  const recommendations = [];
+
+  if (salario && fixedExpenses > salario * 0.45) {
+    recommendations.push({
+      title: 'Reduzir despesas fixas',
+      description: 'Suas contas fixas representam mais de 45% da sua renda. Revise contratos, renegocie e ajuste itens recorrentes.',
+      value: 'Prioridade alta',
+    });
+  }
+
+  if (highestCategory && highestCategory.value > avgSpent * 0.28) {
+    recommendations.push({
+      title: 'Revisar categoria dominante',
+      description: `A categoria ${highestCategory.name} está concentrando grande parte dos gastos. Avalie cortes e metas mensais mais rigorosas.`,
+      value: 'Ajuste mensal',
+    });
+  }
+
+  if (history && history.length > 1) {
+    const recent = Number(history[history.length - 1]?.totalContas || 0);
+    const previousAverage = history.slice(0, -1).reduce((sum, item) => sum + (Number(item.totalContas) || 0), 0) / Math.max(history.length - 1, 1);
+    if (recent > previousAverage * 1.15) {
+      recommendations.push({
+        title: 'Controlar gastos recorrentes',
+        description: 'O último período ficou acima da média histórica. Reduzir pequenos gastos recorrentes pode recuperar mais do que o suficiente.',
+        value: 'Atenção',
+      });
+    }
+  }
+
+  if (recommendations.length === 0) {
+    recommendations.push({
+      title: 'Manter disciplina atual',
+      description: 'Seu padrão financeiro está equilibrado. Continue mantendo a recorrência e a reserva de emergência.',
+      value: 'Estável',
+    });
+  }
+
+  return recommendations.slice(0, 3);
+}
+
 export function Dashboard() {
   const { state } = useFinancial();
+  const [selectedPeriod, setSelectedPeriod] = useState(getStoredPeriod);
+
+  useEffect(() => {
+    const handlePeriodChange = (event) => {
+      setSelectedPeriod(event.detail || getStoredPeriod());
+    };
+
+    window.addEventListener('mertilo-period-change', handlePeriodChange);
+    return () => window.removeEventListener('mertilo-period-change', handlePeriodChange);
+  }, []);
 
   if (state.loading) {
     return (
@@ -47,6 +148,13 @@ export function Dashboard() {
   const contas = state.accounts || [];
   const categorias = state.categories || [];
   const historico = state.history || [];
+  const historicoFiltrado = filterHistoryByPeriod(historico, selectedPeriod);
+  const recommendations = buildSavingsRecommendations({
+    salario,
+    contas,
+    categories: categorias,
+    history: historicoFiltrado,
+  });
 
   // Calcular métricas
   const totalFixos = contas.reduce(
@@ -55,14 +163,14 @@ export function Dashboard() {
   );
   const saldo = salario - totalFixos;
   const gastoMedio =
-    historico.length
-      ? historico.reduce(
+    historicoFiltrado.length
+      ? historicoFiltrado.reduce(
           (sum, item) => sum + (Number(item.totalContas) || 0),
           0
-        ) / historico.length
+        ) / historicoFiltrado.length
       : 0;
-  const rendaTotal = historico.length
-    ? historico.reduce(
+  const rendaTotal = historicoFiltrado.length
+    ? historicoFiltrado.reduce(
         (sum, item) => sum + (Number(item.rendaTotal) || 0),
         0
       )
@@ -130,9 +238,54 @@ export function Dashboard() {
         )}
       </section>
 
+      <section className="panel" style={{ marginTop: '2rem' }}>
+        <div className="panel-header">
+          <div>
+            <h3>Recomendações de economia</h3>
+            <small>{getPeriodLabel(selectedPeriod)}</small>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          {recommendations.map((recommendation, index) => (
+            <div
+              key={`${recommendation.title}-${index}`}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '1rem',
+                padding: '1rem',
+                border: '1px solid rgba(148, 163, 184, 0.2)',
+                borderRadius: '12px',
+                background: 'rgba(15, 23, 42, 0.02)',
+              }}
+            >
+              <div>
+                <strong style={{ display: 'block', marginBottom: '0.35rem' }}>{recommendation.title}</strong>
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>{recommendation.description}</span>
+              </div>
+              <span
+                style={{
+                  padding: '0.35rem 0.7rem',
+                  borderRadius: '999px',
+                  background: 'var(--color-primary-soft, rgba(59, 130, 246, 0.12))',
+                  color: 'var(--color-primary)',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {recommendation.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Histórico e transações recentes */}
       {temHistorico ? (
-        <HistoryPanel history={historico} />
+        <HistoryPanel history={historicoFiltrado} />
       ) : (
         <section className="panel">
           <div className="panel-header">

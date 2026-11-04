@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { apiCall } from '../../../services/api/client';
 import { AlertTriangle, CheckSquare, RefreshCw } from 'lucide-react';
 
 export function IRPFReview() {
@@ -15,22 +16,24 @@ export function IRPFReview() {
   }, [exerciseId]);
 
   async function loadAll() {
+    if (!exerciseId) return;
+
     setLoading(true);
     try {
-      const [vRes, cRes, dRes] = await Promise.all([
-        fetch(`/api/irpf/exercises/${exerciseId}/validations`),
-        fetch(`/api/irpf/exercises/${exerciseId}/corrections`),
-        fetch(`/api/irpf/exercises/${exerciseId}/dashboard`),
+      const [vJson, cJson, dJson] = await Promise.all([
+        apiCall(`/irpf/exercises/${exerciseId}/validations`),
+        apiCall(`/irpf/exercises/${exerciseId}/corrections`),
+        apiCall(`/irpf/exercises/${exerciseId}/dashboard`),
       ]);
 
-      if (!vRes.ok) throw new Error('Erro ao carregar validações');
-      const vJson = await vRes.json();
-      setValidations(vJson || []);
-
-      if (cRes.ok) setCorrections(await cRes.json());
-      if (dRes.ok) setDashboard(await dRes.json());
+      setValidations(Array.isArray(vJson) ? vJson : []);
+      setCorrections(Array.isArray(cJson) ? cJson : []);
+      setDashboard(dJson ?? null);
     } catch (err) {
       console.error(err);
+      setValidations([]);
+      setCorrections([]);
+      setDashboard(null);
     } finally {
       setLoading(false);
     }
@@ -38,9 +41,10 @@ export function IRPFReview() {
 
   async function updateStatus(id, status) {
     try {
-      const res = await fetch(`/api/irpf/validations/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
-      if (!res.ok) throw new Error('Falha ao atualizar');
-      const updated = await res.json();
+      const updated = await apiCall(`/irpf/validations/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      });
       setValidations((prev) => prev.map((p) => (p.id === id ? updated : p)));
     } catch (err) {
       console.error(err);
@@ -48,10 +52,11 @@ export function IRPFReview() {
   }
 
   async function rerun() {
+    if (!exerciseId) return;
+
     try {
       setLoading(true);
-      const res = await fetch(`/api/irpf/exercises/${exerciseId}/validations/rerun`, { method: 'POST' });
-      if (!res.ok) throw new Error('Falha ao reexecutar');
+      await apiCall(`/irpf/exercises/${exerciseId}/validations/rerun`, { method: 'POST' });
       await loadAll();
     } catch (err) {
       console.error(err);

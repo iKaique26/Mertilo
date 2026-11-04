@@ -39,11 +39,22 @@ export function Transactions() {
 
   const historico = state.history || [];
 
-  // Filtrar transações
   const filtradas = historico.filter((item) => {
-    const matchSearch = searchTerm === '' || 
-      item.mes?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchSearch;
+    const matchSearch =
+      searchTerm === '' ||
+      [item.mes, item.categoria, item.tipo, item.conta]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+
+    const saldo = Number(item.saldoDisponivel || 0);
+    const matchType =
+      filterType === 'all' ||
+      (filterType === 'income' && saldo >= 0) ||
+      (filterType === 'expense' && saldo < 0);
+
+    return matchSearch && matchType;
   });
 
   return (
@@ -58,11 +69,11 @@ export function Transactions() {
       </div>
 
       {/* Barra de filtros e busca */}
-      <div className="filters-bar" style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-        <div style={{ flex: 1, position: 'relative' }}>
+      <div className="filters-bar" style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, position: 'relative', minWidth: '220px' }}>
           <input
             type="text"
-            placeholder="Buscar por período..."
+            placeholder="Buscar por período, conta ou categoria..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="input"
@@ -82,7 +93,22 @@ export function Transactions() {
           />
         </div>
 
-        <button className="btn btn-secondary btn-md">
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-text-secondary)' }}>
+          <span>Tipo</span>
+          <select
+            aria-label="Filtrar por tipo de movimentação"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="input"
+            style={{ minWidth: '160px' }}
+          >
+            <option value="all">Todos</option>
+            <option value="income">Entradas</option>
+            <option value="expense">Saídas</option>
+          </select>
+        </label>
+
+        <button className="btn btn-secondary btn-md" type="button" onClick={() => setFilterType('all')}>
           <Filter size={18} strokeWidth={2} />
           Filtrar
         </button>

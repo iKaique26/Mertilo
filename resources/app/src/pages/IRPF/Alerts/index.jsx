@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { apiCall } from '../../../services/api/client';
 import { AlertCircle, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 
 export function IRPFAlerts() {
@@ -42,23 +43,22 @@ export function IRPFAlerts() {
     },
   };
 
-  // Carregar alertas
   useEffect(() => {
-    if (state.currentExerciseId) {
+    if (exerciseId) {
       loadAlerts();
     }
-  }, [state.currentExerciseId]);
+  }, [exerciseId]);
 
   async function loadAlerts() {
+    if (!exerciseId) return;
+
     try {
       setLoading(true);
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/exercises/${state.currentExerciseId}/alerts-pending`
-      );
-      const data = await response.json();
-      setAlerts(data || []);
+      const data = await apiCall(`/irpf/exercises/${exerciseId}/alerts-pending`);
+      setAlerts(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar alertas:', error);
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -66,18 +66,14 @@ export function IRPFAlerts() {
 
   async function resolveAlert(alertId) {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/irpf/alerts/${alertId}/resolve`, {
-        method: 'PUT',
-      });
-
-      if (!response.ok) throw new Error('Erro ao resolver alerta');
+      await apiCall(`/irpf/alerts/${alertId}/resolve`, { method: 'PUT' });
       await loadAlerts();
     } catch (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
-  if (!state.currentExerciseId) {
+  if (!exerciseId) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <p style={{ color: 'var(--color-text-secondary)' }}>Selecione um exercício primeiro</p>

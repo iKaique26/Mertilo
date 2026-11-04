@@ -3,7 +3,9 @@
  * Lógica de negócio para o módulo de Imposto de Renda
  */
 
+import fs from 'fs';
 import { logger } from '../utils/logger.js';
+import { getDatabase, withTransaction } from '../database/db.js';
 import {
   exercisesRepository,
   documentsRepository,
@@ -126,6 +128,28 @@ export const irpfService = {
     try {
       const doc = documentsRepository.getById(id, userId);
       if (!doc) return false;
+
+      const db = getDatabase();
+      const exerciseId = doc.exercise_id;
+
+      withTransaction(() => {
+        db.prepare('DELETE FROM irpf_correction_history WHERE exercise_id = ? AND document_id = ?').run(exerciseId, id);
+        db.prepare('DELETE FROM irpf_income WHERE exercise_id = ? AND document_id = ?').run(exerciseId, id);
+        db.prepare('DELETE FROM irpf_assets WHERE exercise_id = ? AND document_id = ?').run(exerciseId, id);
+        db.prepare('DELETE FROM irpf_deductions WHERE exercise_id = ? AND document_id = ?').run(exerciseId, id);
+        db.prepare('DELETE FROM irpf_alerts WHERE exercise_id = ? AND related_id = ?').run(exerciseId, id);
+        db.prepare('DELETE FROM irpf_validations WHERE exercise_id = ? AND (source_document_id = ? OR related_document_id = ? OR related_document_id LIKE ? OR related_document_id LIKE ?)')
+          .run(exerciseId, id, id, `${id},%`, `%,${id}`);
+      });
+
+      try {
+        if (doc.file_path && fs.existsSync(doc.file_path)) {
+          fs.unlinkSync(doc.file_path);
+        }
+      } catch (fileError) {
+        logger.warn('Arquivo de documento não pôde ser removido durante exclusão segura:', fileError);
+      }
+
       return documentsRepository.delete(id, userId);
     } catch (error) {
       logger.error('Erro ao deletar documento:', error);

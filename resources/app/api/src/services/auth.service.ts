@@ -11,12 +11,16 @@ function randomNumericCode(len = 6) {
   return s;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret';
+const isProduction = process.env.NODE_ENV === 'production';
+const JWT_SECRET = process.env.JWT_SECRET ?? (isProduction ? 'mertilo-production-secret-must-be-set' : 'dev-secret');
+if (isProduction && !process.env.JWT_SECRET) {
+  logger.warn('JWT_SECRET não configurado em produção; usando fallback inseguro temporário. Defina uma secret forte em variáveis de ambiente.');
+}
 const JWT_EXP = process.env.JWT_EXPIRATION ?? '7d';
 const VERIFICATION_TTL_MS = 1000 * 60 * 60;
 const VERIFICATION_MAX_ATTEMPTS = 5;
-const RESEND_INTERVAL_MS = 60 * 1000;
-const RESEND_MAX_PER_WINDOW = 3;
+const VERIFICATION_RETRY_INTERVAL_MS = 60 * 1000;
+const VERIFICATION_RETRY_MAX_PER_WINDOW = 3;
 
 function maskEmail(email: string) {
   const [local, domain] = email.split('@');
@@ -36,46 +40,67 @@ export const authService = {
     const normalizedName = name.trim();
     logger.info('[EMAIL] register requested', { email: safeEmail, name: normalizedName });
 
-    const existing = usersRepository.findByEmail(normalizedEmail);
-    if (existing && existing.is_verified) throw new Error('Email já cadastrado');
+    const previousUser = usersRepository.findByEmail(normalizedEmail);
+    if (previousUser && previousUser.is_verified) throw new Error('Email já cadastrado');
 
+    const previousSnapshot = previousUser ? { ...previousUser } : null;
     const password_hash = await bcrypt.hash(password, 10);
 
-    let user: User;
-    if (!existing) {
-      user = usersRepository.create({ name: normalizedName, email: normalizedEmail, password_hash, is_verified: false });
-    } else {
-      const db = (await import('../database/db.js')).getDatabase();
-      db.prepare('UPDATE users SET name = ?, email = ?, password_hash = ?, is_verified = 0, updated_at = ? WHERE id = ?')
-        .run(normalizedName, normalizedEmail, password_hash, new Date().toISOString(), existing.id);
-      const reloadedUser = usersRepository.findById(existing.id);
-      if (!reloadedUser) throw new Error('Usuário pendente não encontrado');
-      user = reloadedUser;
-    }
+    let user: User | null = null;
+    let createdVerificationId: string | null = null;
 
-    usersRepository.invalidatePreviousVerificationCodes(user.id);
-    const code = randomNumericCode(6);
-    logger.info('[EMAIL] verification code generated', { userId: user.id, email: safeEmail });
-    const codeHash = await bcrypt.hash(code, 10);
-    const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
-    usersRepository.createVerificationCode(user.id, codeHash, expiresAt);
-    logger.info('[EMAIL] verification code persisted', { userId: user.id, email: safeEmail, expiresAt });
-    logger.info('[EMAIL] email service called', { userId: user.id, email: safeEmail });
-    await emailService.sendVerificationCode(user.email, code, 60);
-    logger.info('[EMAIL] email service returned', { userId: user.id, email: safeEmail });
-
-    const totalUsers = usersRepository.countUsers();
-    if (totalUsers === 1) {
-      try {
-        usersRepository.assignLegacyDataToUser(user.id);
-      } catch (err) {
-        // fail silently; not critical
+    try {
+      if (!previousUser) {
+        user = usersRepository.create({ name: normalizedName, email: normalizedEmail, password_hash, is_verified: false });
+      } else {
+        const db = (await import('../database/db.js')).getDatabase();
+        db.prepare('UPDATE users SET name = ?, email = ?, password_hash = ?, is_verified = 0, updated_at = ? WHERE id = ?')
+          .run(normalizedName, normalizedEmail, password_hash, new Date().toISOString(), previousUser.id);
+        const reloadedUser = usersRepository.findById(previousUser.id);
+        if (!reloadedUser) throw new Error('Usuário pendente não encontrado');
+        user = reloadedUser;
       }
-    }
 
-    const result: any = { user: { id: user.id, name: user.name, email: user.email, is_verified: false } };
-    if (process.env.NODE_ENV === 'test') result.verification_code = code;
-    return result;
+      usersRepository.invalidatePreviousVerificationCodes(user.id);
+      const code = randomNumericCode(6);
+      logger.info('[EMAIL] verification code generated', { userId: user.id, email: safeEmail });
+      const codeHash = await bcrypt.hash(code, 10);
+      const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
+      createdVerificationId = usersRepository.createVerificationCode(user.id, codeHash, expiresAt);
+      logger.info('[EMAIL] verification code persisted', { userId: user.id, email: safeEmail, expiresAt });
+      logger.info('[EMAIL] email service called', { userId: user.id, email: safeEmail });
+      await emailService.sendVerificationCode(user.email, code, 60);
+      logger.info('[EMAIL] email service returned', { userId: user.id, email: safeEmail });
+
+      const totalUsers = usersRepository.countUsers();
+      if (totalUsers === 1) {
+        try {
+          usersRepository.assignLegacyDataToUser(user.id);
+        } catch (err) {
+          // fail silently; not critical
+        }
+      }
+
+      const result: any = { user: { id: user.id, name: user.name, email: user.email, is_verified: false } };
+      if (process.env.NODE_ENV === 'test') result.verification_code = code;
+      return result;
+    } catch (error) {
+      const db = (await import('../database/db.js')).getDatabase();
+
+      if (createdVerificationId) {
+        db.prepare('DELETE FROM verification_codes WHERE id = ?').run(createdVerificationId);
+      }
+
+      if (previousUser && previousSnapshot) {
+        db.prepare('UPDATE users SET name = ?, email = ?, password_hash = ?, is_verified = ?, updated_at = ? WHERE id = ?')
+          .run(previousSnapshot.name, previousSnapshot.email, previousSnapshot.password_hash, previousSnapshot.is_verified ? 1 : 0, new Date().toISOString(), previousSnapshot.id);
+      } else if (user) {
+        db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+        db.prepare('DELETE FROM verification_codes WHERE user_id = ?').run(user.id);
+      }
+
+      throw error;
+    }
   },
 
   async login(email: string, password: string) {
@@ -131,7 +156,7 @@ export const authService = {
 
     if (process.env.NODE_ENV !== 'test') {
       const latest = usersRepository.getLatestVerificationCode(user.id);
-      if (latest && Date.now() - new Date(latest.created_at).getTime() < RESEND_INTERVAL_MS) {
+      if (latest && Date.now() - new Date(latest.created_at).getTime() < VERIFICATION_RETRY_INTERVAL_MS) {
         throw new Error('Aguarde um momento antes de solicitar outro código.');
       }
 
@@ -139,7 +164,7 @@ export const authService = {
       const windowStart = new Date(Date.now() - 1000 * 60 * 60).toISOString();
       const recentRow = db.prepare('SELECT COUNT(*) as c FROM verification_codes WHERE user_id = ? AND created_at > ?').get(user.id, windowStart) as { c?: number } | undefined;
       const recentCount = Number(recentRow?.c ?? 0);
-      if (recentCount >= RESEND_MAX_PER_WINDOW) {
+      if (recentCount >= VERIFICATION_RETRY_MAX_PER_WINDOW) {
         throw new Error('Muitas tentativas de reenvio. Tente novamente mais tarde.');
       }
     }
@@ -184,6 +209,7 @@ export const authService = {
     const password_hash = await bcrypt.hash(newPassword, 10);
     const db = (await import('../database/db.js')).getDatabase();
     db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(password_hash, new Date().toISOString(), user.id);
+    usersRepository.invalidateUserSessions(user.id);
     usersRepository.markPasswordResetUsed(record.id);
     return true;
   },
@@ -197,6 +223,7 @@ export const authService = {
     const password_hash = await bcrypt.hash(newPassword, 10);
     const db = (await import('../database/db.js')).getDatabase();
     db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(password_hash, new Date().toISOString(), user.id);
+    usersRepository.invalidateUserSessions(user.id);
     return true;
   },
 

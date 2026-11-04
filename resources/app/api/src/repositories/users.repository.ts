@@ -177,5 +177,10 @@ export const usersRepository = {
   invalidateSession(token: string) {
     const db = getDatabase();
     db.prepare('DELETE FROM user_sessions WHERE token = ?').run(token);
+  },
+
+  invalidateUserSessions(userId: string) {
+    const db = getDatabase();
+    db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(userId);
   }
 };

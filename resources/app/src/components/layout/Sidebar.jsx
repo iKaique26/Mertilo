@@ -9,6 +9,7 @@ import {
   Wallet,
   Tags,
   FileText,
+  Upload,
 } from 'lucide-react';
 
 export function Sidebar() {
@@ -38,6 +39,12 @@ export function Sidebar() {
       label: 'Categorias',
       Icon: Tags,
       ariaLabel: 'Ir para Categorias',
+    },
+    {
+      path: '/importacao-financeira',
+      label: 'Importação Financeira',
+      Icon: Upload,
+      ariaLabel: 'Ir para Importação Financeira',
     },
     {
       path: '/irpf',

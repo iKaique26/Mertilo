@@ -62,6 +62,15 @@ test('register and auth two users', async () => {
   tokenB = lB.body.token;
 });
 
+test('aggregate finance endpoint requires authentication', async () => {
+  const unauth = await api('/financas');
+  assert.strictEqual(unauth.status, 401);
+
+  const authed = await api('/financas', { headers: { Authorization: `Bearer ${tokenA}` } });
+  assert.strictEqual(authed.status, 200);
+  assert.ok(authed.body && typeof authed.body === 'object');
+});
+
 test('User A creates financial and IRPF resources', async () => {
   // Category (may be global)
   const cat = await api('/categories', { method: 'POST', headers: { Authorization: `Bearer ${tokenA}` }, body: JSON.stringify({ nome: 'Cat A', cor: '#fff', percentual: 0.1 }) });

@@ -4,8 +4,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useTax } from '../../context/TaxIRPFContext';
+import { apiCall } from '../../services/api/client';
 import { FileText, Plus, ChevronRight, AlertCircle, CheckCircle, AlertTriangle, FileCheck, DollarSign, Home, Users, Percent, Brain } from 'lucide-react';
 
 export function IRPF() {
@@ -18,27 +19,29 @@ export function IRPF() {
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  // Carregar exercícios na montagem
+  const safeExercises = Array.isArray(state.exercises) ? state.exercises : [];
+
   useEffect(() => {
     loadExercises();
   }, []);
 
-  // Carregar resumo quando exercício muda
   useEffect(() => {
-    if (state.currentExerciseId) {
+    const exerciseId = state.currentExerciseId ?? safeExercises[0]?.id ?? null;
+
+    if (exerciseId) {
+      dispatch({ type: 'SET_CURRENT_EXERCISE', payload: exerciseId });
       loadSummary();
       loadDashboard();
     }
-  }, [state.currentExerciseId]);
+  }, [state.currentExerciseId, safeExercises.length]);
 
   async function loadDashboard() {
+    if (!state.currentExerciseId) return;
+
     try {
       setDashboardLoading(true);
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/exercises/${state.currentExerciseId}/dashboard`
-      );
-      const data = await response.json();
-      setDashboard(data);
+      const data = await apiCall(`/irpf/exercises/${state.currentExerciseId}/dashboard`);
+      setDashboard(data ?? null);
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
     } finally {
@@ -51,16 +54,17 @@ export function IRPF() {
       setLoading(true);
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      const response = await fetch('http://127.0.0.1:5000/api/irpf/exercises');
-      const data = await response.json();
+      const data = await apiCall('/irpf/exercises');
+      const normalized = Array.isArray(data) ? data : [];
 
-      setExercises(data);
-      dispatch({ type: 'SET_EXERCISES', payload: data });
-      if (data.length > 0) {
-        dispatch({ type: 'SET_CURRENT_EXERCISE', payload: data[0].id });
-      }
+      setExercises(normalized);
+      dispatch({ type: 'SET_EXERCISES', payload: normalized });
+      dispatch({ type: 'SET_CURRENT_EXERCISE', payload: normalized[0]?.id ?? null });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao carregar exercícios';
+      setExercises([]);
+      dispatch({ type: 'SET_EXERCISES', payload: [] });
+      dispatch({ type: 'SET_CURRENT_EXERCISE', payload: null });
       dispatch({ type: 'SET_ERROR', payload: message });
     } finally {
       setLoading(false);
@@ -69,12 +73,11 @@ export function IRPF() {
   }
 
   async function loadSummary() {
+    if (!state.currentExerciseId) return;
+
     try {
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/exercises/${state.currentExerciseId}/summary`
-      );
-      const data = await response.json();
-      setSummary(data);
+      const data = await apiCall(`/irpf/exercises/${state.currentExerciseId}/summary`);
+      setSummary(data ?? null);
     } catch (error) {
       console.error('Erro ao carregar resumo:', error);
     }
@@ -84,17 +87,14 @@ export function IRPF() {
     e.preventDefault();
     try {
       setLoading(true);
-      const response = await fetch('http://127.0.0.1:5000/api/irpf/exercises', {
+      const exercise = await apiCall('/irpf/exercises', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ year: newYear }),
       });
 
-      if (!response.ok) throw new Error('Erro ao criar exercício');
-      const exercise = await response.json();
-
-      setExercises([...exercises, exercise]);
-      dispatch({ type: 'SET_EXERCISES', payload: [...exercises, exercise] });
+      const nextExercises = [...safeExercises, exercise];
+      setExercises(nextExercises);
+      dispatch({ type: 'SET_EXERCISES', payload: nextExercises });
       dispatch({ type: 'SET_CURRENT_EXERCISE', payload: exercise.id });
       setShowForm(false);
       setNewYear(new Date().getFullYear());
@@ -110,7 +110,7 @@ export function IRPF() {
     dispatch({ type: 'SET_CURRENT_EXERCISE', payload: id });
   }
 
-  const currentExercise = state.exercises.find((e) => e.id === state.currentExerciseId);
+  const currentExercise = safeExercises.find((e) => e.id === state.currentExerciseId) ?? safeExercises[0] ?? null;
 
   return (
     <>
@@ -177,7 +177,7 @@ export function IRPF() {
         <div style={{ textAlign: 'center', padding: '3rem' }}>
           <div style={{ color: 'var(--color-text-secondary)' }}>Carregando...</div>
         </div>
-      ) : state.exercises.length === 0 ? (
+      ) : safeExercises.length === 0 ? (
         <div
           style={{
             background: 'var(--color-bg-secondary)',
@@ -205,7 +205,7 @@ export function IRPF() {
             gap: '1rem',
           }}
         >
-          {state.exercises.map((exercise) => (
+          {safeExercises.map((exercise) => (
             <div
               key={exercise.id}
               onClick={() => selectExercise(exercise.id)}

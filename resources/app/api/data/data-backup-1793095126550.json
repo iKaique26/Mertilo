@@ -1,0 +1,47 @@
+{
+  "historico": [],
+  "salario": 0,
+  "contas": [
+    {
+      "id": "1760575454506",
+      "nome": "Internet",
+      "valor": 99.9,
+      "categoria": "1",
+      "isFixed": true,
+      "data": "2025-10-16T00:44:14.506Z"
+    },
+    {
+      "id": "1760575641456",
+      "nome": "Cartão Neon",
+      "valor": 195.68,
+      "categoria": "1",
+      "isFixed": false,
+      "data": "2025-10-16T00:47:21.456Z"
+    },
+    {
+      "id": "1760575697114",
+      "nome": "Cartão Nubank",
+      "valor": 471.02,
+      "categoria": "1",
+      "isFixed": false,
+      "data": "2025-10-16T00:48:17.114Z"
+    },
+    {
+      "id": "1760578685587",
+      "nome": "Plano Metro",
+      "valor": 59.9,
+      "categoria": "2",
+      "isFixed": false,
+      "data": "2025-10-16T01:38:05.588Z"
+    },
+    {
+      "id": "1760578705868",
+      "nome": "Academia",
+      "valor": 129.9,
+      "categoria": "3",
+      "isFixed": false,
+      "data": "2025-10-16T01:38:25.868Z"
+    }
+  ],
+  "categorias": []
+}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { apiCall } from '../../../services/api/client';
 import { AlertCircle, CheckCircle, AlertTriangle, Info, TrendingUp, Clock } from 'lucide-react';
 
 export function IRPFAssistant() {
@@ -16,17 +17,13 @@ export function IRPFAssistant() {
   }, [exerciseId]);
 
   async function loadAnalysis() {
+    if (!exerciseId) return;
+
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/irpf/exercises/${exerciseId}/assistant`);
-      
-      if (!response.ok) {
-        throw new Error('Erro ao carregar análise do assistente');
-      }
-      
-      const data = await response.json();
-      setAnalysis(data);
+      const data = await apiCall(`/irpf/exercises/${exerciseId}/assistant`);
+      setAnalysis(data ?? null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao carregar';
       setError(message);

@@ -17,6 +17,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { Accounts } from './pages/Accounts';
 import { Categories } from './pages/Categories';
+import { ImportacaoFinanceira } from './pages/ImportacaoFinanceira';
 import { IRPF } from './pages/IRPF';
 import { IRPFAssistant } from './pages/IRPF/Assistant';
 import { IRPFDocuments } from './pages/IRPF/Documents';
@@ -76,6 +77,16 @@ export function App() {
                 <RequireAuth>
                   <MainLayout>
                     <Categories />
+                  </MainLayout>
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/importacao-financeira"
+              element={
+                <RequireAuth>
+                  <MainLayout>
+                    <ImportacaoFinanceira />
                   </MainLayout>
                 </RequireAuth>
               }

@@ -46,12 +46,50 @@ export interface VehicleExpense {
   lucro: number;
 }
 
+export interface ImportedFinancialTransaction {
+  id: string;
+  date: string;
+  description: string;
+  normalizedDescription: string;
+  originalDescription: string;
+  value: number;
+  type: 'entrada' | 'saída' | 'transferencia';
+  category: string;
+  subcategory: string;
+  confidence: number;
+  account?: string;
+  source: string;
+  status: 'importado' | 'revisao';
+  duplicateHash?: string;
+  potentialDuplicate?: boolean;
+  manualReview?: boolean;
+  line: number;
+  importSource: string;
+  importedAt: string;
+}
+
+export interface FinancialImportHistoryEntry {
+  id: string;
+  fileName: string;
+  importedAt: string;
+  summary: {
+    total: number;
+    imported: number;
+    duplicates: number;
+    invalid: number;
+    toReview: number;
+  };
+  transactions: ImportedFinancialTransaction[];
+}
+
 export interface AppData {
   salario: number;
   contas: Account[];
   categorias: Category[];
   historico: MonthlyHistory[];
   vexpenses: VehicleExpense[];
+  importHistory: FinancialImportHistoryEntry[];
+  importedTransactions: ImportedFinancialTransaction[];
 }
 
 /**
@@ -64,6 +102,8 @@ export interface FinancialState {
   categories: Category[];
   history: MonthlyHistory[];
   vehicleExpenses: VehicleExpense[];
+  importHistory: FinancialImportHistoryEntry[];
+  importedTransactions: ImportedFinancialTransaction[];
 
   // Estados de loading/erro
   loading: boolean;

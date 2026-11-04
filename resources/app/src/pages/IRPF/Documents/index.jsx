@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
+import { apiCall } from '../../../services/api/client';
 import { Upload, FileText, Trash2, Eye, X, Check, AlertCircle } from 'lucide-react';
 
 const ALLOWED_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
@@ -25,14 +26,13 @@ export function IRPFDocuments() {
   }, [exerciseId]);
 
   async function loadDocuments() {
+    if (!exerciseId) return;
+
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/documents/exercise/${exerciseId}`
-      );
-      const docs = await response.json();
-      setDocuments(docs || []);
+      const docs = await apiCall(`/irpf/documents/exercise/${exerciseId}`);
+      setDocuments(Array.isArray(docs) ? docs : []);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao carregar';
       setError(message);
@@ -65,6 +65,8 @@ export function IRPFDocuments() {
   }
 
   async function uploadFile(file) {
+    if (!exerciseId) return;
+
     try {
       setLoading(true);
       setUploadProgress(0);
@@ -73,29 +75,18 @@ export function IRPFDocuments() {
       const fileContent = await readFileAsBase64(file);
       setUploadProgress(50);
 
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/documents/${exerciseId}/upload`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filename: file.name,
-            mime_type: file.type,
-            file_size: file.size,
-            file_content: fileContent,
-          }),
-        }
-      );
+      const result = await apiCall(`/irpf/documents/${exerciseId}/upload`, {
+        method: 'POST',
+        body: JSON.stringify({
+          filename: file.name,
+          mime_type: file.type,
+          file_size: file.size,
+          file_content: fileContent,
+        }),
+      });
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || 'Upload falhou');
-      }
-
-      const result = await response.json();
       setUploadProgress(100);
-      
-      if (result.extraction && result.document) {
+      if (result && result.extraction && result.document) {
         setSelectedDoc(result.document);
         setReviewData(result.extraction);
         setReviewMode(true);
@@ -126,19 +117,13 @@ export function IRPFDocuments() {
     try {
       setConfirming(true);
 
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/documents/${selectedDoc.id}/confirm`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            extracted_data: reviewData,
-            corrections: {},
-          }),
-        }
-      );
-
-      if (!response.ok) throw new Error('Confirmação falhou');
+      await apiCall(`/irpf/documents/${selectedDoc.id}/confirm`, {
+        method: 'POST',
+        body: JSON.stringify({
+          extracted_data: reviewData,
+          corrections: {},
+        }),
+      });
 
       setReviewMode(false);
       setSelectedDoc(null);
@@ -155,11 +140,7 @@ export function IRPFDocuments() {
     if (!window.confirm('Tem certeza?')) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/irpf/documents/${docId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Erro ao deletar');
+      await apiCall(`/irpf/documents/${docId}`, { method: 'DELETE' });
       await loadDocuments();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao deletar');

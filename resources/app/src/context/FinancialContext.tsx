@@ -3,9 +3,10 @@
  * Gerencia estado global de dados financeiros
  */
 
-import React, { createContext, useReducer, useEffect } from 'react';
+import React, { createContext, useReducer, useEffect, useContext } from 'react';
 import type { FinancialState, FinancialAction, AppData } from '../types';
 import { financialService } from '../services/api/financial';
+import { AuthContext } from './AuthContext';
 
 export const FinancialContext = createContext<
   { state: FinancialState; dispatch: React.Dispatch<FinancialAction> } | undefined
@@ -17,6 +18,8 @@ const initialState: FinancialState = {
   categories: [],
   history: [],
   vehicleExpenses: [],
+  importHistory: [],
+  importedTransactions: [],
   loading: true,
   error: null,
   selectedCategory: null,
@@ -44,6 +47,8 @@ function financialReducer(
         categories: action.payload.categorias,
         history: action.payload.historico,
         vehicleExpenses: action.payload.vexpenses,
+        importHistory: action.payload.importHistory || [],
+        importedTransactions: action.payload.importedTransactions || [],
         loading: false,
         error: null,
       };
@@ -104,9 +109,19 @@ function financialReducer(
  */
 export function FinancialProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(financialReducer, initialState);
+  const auth = useContext(AuthContext);
+  const token = auth?.token;
+  const authLoading = auth?.loading ?? false;
 
-  // Carrega dados quando o componente monta
   useEffect(() => {
+    if (!token || authLoading) {
+      if (!token) {
+        dispatch({ type: 'SET_LOADING', payload: false });
+        dispatch({ type: 'SET_ERROR', payload: null });
+      }
+      return;
+    }
+
     async function loadData() {
       try {
         dispatch({ type: 'SET_LOADING', payload: true });
@@ -119,7 +134,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     }
 
     loadData();
-  }, []);
+  }, [token, authLoading]);
 
   return (
     <FinancialContext.Provider value={{ state, dispatch }}>

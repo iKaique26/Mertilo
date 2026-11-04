@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { apiCall } from '../../../services/api/client';
 import { Plus, Trash2, Check, X, Eye } from 'lucide-react';
 
 export function IRPFIncome() {
@@ -21,7 +22,6 @@ export function IRPFIncome() {
     source: '',
   });
 
-  // Carregar rendimentos
   useEffect(() => {
     if (exerciseId) {
       loadIncomes();
@@ -29,15 +29,15 @@ export function IRPFIncome() {
   }, [exerciseId]);
 
   async function loadIncomes() {
+    if (!exerciseId) return;
+
     try {
       setLoading(true);
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/income/exercise/${exerciseId}`
-      );
-      const data = await response.json();
-      setIncomes(data || []);
+      const data = await apiCall(`/irpf/income/exercise/${exerciseId}`);
+      setIncomes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar rendimentos:', error);
+      setIncomes([]);
     } finally {
       setLoading(false);
     }
@@ -45,15 +45,14 @@ export function IRPFIncome() {
 
   async function handleAddIncome(e) {
     e.preventDefault();
-    if (!formData.description || !formData.amount || !formData.income_type) {
+    if (!exerciseId || !formData.description || !formData.amount || !formData.income_type) {
       alert('Preencha todos os campos obrigatórios');
       return;
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/irpf/income', {
+      await apiCall('/irpf/income', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           exercise_id: exerciseId,
           income_type: formData.income_type,
@@ -66,28 +65,23 @@ export function IRPFIncome() {
         }),
       });
 
-      if (!response.ok) throw new Error('Erro ao adicionar rendimento');
-
       await loadIncomes();
       setFormData({ income_type: 'tributavel', description: '', amount: '', month: '', source: '' });
       setShowForm(false);
     } catch (error) {
-      alert('Erro ao adicionar rendimento: ' + error.message);
+      alert('Erro ao adicionar rendimento: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
   async function handleVerifyIncome(incomeId) {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/irpf/income/${incomeId}`, {
+      await apiCall(`/irpf/income/${incomeId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_verified: true }),
       });
-
-      if (!response.ok) throw new Error('Erro ao verificar rendimento');
       await loadIncomes();
     } catch (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
@@ -95,18 +89,14 @@ export function IRPFIncome() {
     if (!confirm('Tem certeza que deseja deletar este rendimento?')) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/irpf/income/${incomeId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Erro ao deletar');
+      await apiCall(`/irpf/income/${incomeId}`, { method: 'DELETE' });
       await loadIncomes();
     } catch (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
-  if (!state.currentExerciseId) {
+  if (!exerciseId) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <p style={{ color: 'var(--color-text-secondary)' }}>Selecione um exercício primeiro</p>

@@ -4,7 +4,7 @@ import { spawn, execSync } from 'child_process';
 import path from 'path';
 import Database from 'better-sqlite3';
 import nodemailer from 'nodemailer';
-import { ResendEmailProvider, SmtpEmailProvider } from '../services/email-provider.js';
+import { BrevoApiEmailProvider, SmtpEmailProvider } from '../services/email-provider.js';
 
 const DEFAULT_PORT = 6004 + Math.floor(Math.random() * 200);
 const PORT = process.env.TEST_PORT || String(DEFAULT_PORT);
@@ -43,28 +43,37 @@ function clearTestPort() {
   return;
 }
 
-test('resend provider posts to official API with env config', async () => {
-  const originalKey = process.env.RESEND_API_KEY;
-  const originalFrom = process.env.RESEND_FROM_EMAIL;
-  const originalName = process.env.RESEND_FROM_NAME;
-  const originalFetch = global.fetch;
+test('brevo smtp provider uses TLS-validated relay when configured', async () => {
+  const originalHost = process.env.SMTP_HOST;
+  const originalPort = process.env.SMTP_PORT;
+  const originalUser = process.env.SMTP_USER;
+  const originalPass = process.env.SMTP_PASS;
+  const originalPassword = process.env.SMTP_PASSWORD;
+  const originalFrom = process.env.SMTP_FROM;
+  const originalSecure = process.env.SMTP_SECURE;
+  const originalCreateTransport = nodemailer.createTransport;
 
-  process.env.RESEND_API_KEY = 'test-resend-key';
-  process.env.RESEND_FROM_EMAIL = 'no-reply@mertilo.com';
-  process.env.RESEND_FROM_NAME = 'Mertilo';
+  process.env.SMTP_HOST = 'smtp-relay.brevo.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'brevo-user';
+  process.env.SMTP_PASS = 'brevo-pass';
+  process.env.SMTP_FROM = 'no-reply@mertilo.com';
+  process.env.SMTP_SECURE = 'false';
 
-  let posted: any = null;
-  (global as any).fetch = async (_url: string, init?: any) => {
-    posted = JSON.parse(init.body);
+  let sent: any = null;
+  (nodemailer as any).createTransport = ((config: any) => {
+    sent = config;
     return {
-      ok: true,
-      async json() { return { id: 'resend-message-id' }; },
-      async text() { return ''; },
-    } as any;
-  };
+      verify: async () => true,
+      sendMail: async (mail: any) => {
+        sent.mail = mail;
+        return { messageId: 'brevo-message-id' };
+      },
+    };
+  }) as any;
 
   try {
-    const provider = new ResendEmailProvider();
+    const provider = new SmtpEmailProvider();
     const result = await provider.send({
       to: 'customer@example.com',
       subject: 'Confirme seu e-mail — Mertilo',
@@ -72,18 +81,250 @@ test('resend provider posts to official API with env config', async () => {
       html: '<p>Código: <strong>123456</strong></p>',
     });
 
-    assert.strictEqual(result.provider, 'resend');
-    assert.strictEqual(result.messageId, 'resend-message-id');
-    assert.strictEqual(posted.to[0], 'customer@example.com');
-    assert.strictEqual(posted.subject, 'Confirme seu e-mail — Mertilo');
-    assert.match(posted.html, /123456/);
-    assert.match(posted.text, /123456/);
-    assert.strictEqual(posted.from, 'Mertilo <no-reply@mertilo.com>');
+    assert.strictEqual(result.provider, 'smtp');
+    assert.strictEqual(result.messageId, 'brevo-message-id');
+    assert.strictEqual(sent.host, 'smtp-relay.brevo.com');
+    assert.strictEqual(sent.port, 587);
+    assert.strictEqual(sent.secure, false);
+    assert.strictEqual(sent.tls.rejectUnauthorized, true);
+    assert.strictEqual(sent.auth.user, 'brevo-user');
+    assert.strictEqual(sent.mail.to, 'customer@example.com');
+    assert.strictEqual(sent.mail.from, 'no-reply@mertilo.com');
   } finally {
-    (global as any).fetch = originalFetch;
-    if (originalKey === undefined) delete process.env.RESEND_API_KEY; else process.env.RESEND_API_KEY = originalKey;
-    if (originalFrom === undefined) delete process.env.RESEND_FROM_EMAIL; else process.env.RESEND_FROM_EMAIL = originalFrom;
-    if (originalName === undefined) delete process.env.RESEND_FROM_NAME; else process.env.RESEND_FROM_NAME = originalName;
+    (nodemailer as any).createTransport = originalCreateTransport;
+    if (originalHost === undefined) delete process.env.SMTP_HOST; else process.env.SMTP_HOST = originalHost;
+    if (originalPort === undefined) delete process.env.SMTP_PORT; else process.env.SMTP_PORT = originalPort;
+    if (originalUser === undefined) delete process.env.SMTP_USER; else process.env.SMTP_USER = originalUser;
+    if (originalPass === undefined) delete process.env.SMTP_PASS; else process.env.SMTP_PASS = originalPass;
+    if (originalPassword === undefined) delete process.env.SMTP_PASSWORD; else process.env.SMTP_PASSWORD = originalPassword;
+    if (originalFrom === undefined) delete process.env.SMTP_FROM; else process.env.SMTP_FROM = originalFrom;
+    if (originalSecure === undefined) delete process.env.SMTP_SECURE; else process.env.SMTP_SECURE = originalSecure;
+  }
+});
+
+test('register rolls back when email delivery fails and returns a generic error', async () => {
+  const { authService } = await import('../services/auth.service.js');
+  const { initializeDatabase, shutdownDatabase } = await import('../database/index.js');
+  const { getDatabase } = await import('../database/db.js');
+  const { emailService } = await import('../services/email.service.js');
+  const originalSendVerificationCode = emailService.sendVerificationCode;
+  const originalEmailProvider = process.env.EMAIL_PROVIDER;
+  const originalDbPath = process.env.MERTILO_DB_PATH;
+
+  process.env.EMAIL_PROVIDER = 'auto';
+  process.env.MERTILO_DB_PATH = path.join(process.cwd(), 'data', `mertilo.rollback.test.${Date.now()}.db`);
+  await initializeDatabase();
+  emailService.sendVerificationCode = async () => {
+    throw new Error('Falha no envio pela API Brevo: Key not found');
+  };
+
+  try {
+    const email = `rollback.${Date.now()}@example.com`;
+    await assert.rejects(
+      () => authService.register('Rollback User', email, 'Password123!'),
+      /Falha no envio|Key not found/i,
+    );
+
+    const db = getDatabase();
+    const user = db.prepare('SELECT COUNT(*) as c FROM users WHERE lower(email) = ?').get(email.toLowerCase()) as { c?: number };
+    assert.strictEqual(Number(user?.c ?? 0), 0);
+
+    const verificationRows = db.prepare('SELECT COUNT(*) as c FROM verification_codes').get() as { c?: number };
+    assert.strictEqual(Number(verificationRows?.c ?? 0), 0);
+  } finally {
+    emailService.sendVerificationCode = originalSendVerificationCode;
+    await shutdownDatabase();
+    if (originalEmailProvider === undefined) delete process.env.EMAIL_PROVIDER; else process.env.EMAIL_PROVIDER = originalEmailProvider;
+    if (originalDbPath === undefined) delete process.env.MERTILO_DB_PATH; else process.env.MERTILO_DB_PATH = originalDbPath;
+  }
+});
+
+test('brevo api provider sends via official API and uses api-key header', async () => {
+  const originalApiKey = process.env.BREVO_API_KEY;
+  const originalFrom = process.env.SMTP_FROM;
+  const originalFetch = global.fetch;
+
+  process.env.BREVO_API_KEY = 'test-brevo-key';
+  process.env.SMTP_FROM = 'no-reply@mertilo.com';
+
+  let captured: any = null;
+  global.fetch = (async (input: any, init: any) => {
+    captured = { input, init };
+    return {
+      ok: true,
+      status: 201,
+      text: async () => JSON.stringify({ messageId: 'api-message-id' }),
+    } as any;
+  }) as any;
+
+  try {
+    const provider = new BrevoApiEmailProvider();
+    const result = await provider.send({
+      to: 'customer@example.com',
+      subject: 'Confirme seu e-mail — Mertilo',
+      text: 'Código: 123456',
+      html: '<p>Código: <strong>123456</strong></p>',
+    });
+
+    assert.strictEqual(result.provider, 'api');
+    assert.strictEqual(result.messageId, 'api-message-id');
+    assert.strictEqual(captured.init.headers['api-key'], 'test-brevo-key');
+    assert.strictEqual(JSON.parse(captured.init.body).to[0].email, 'customer@example.com');
+    assert.strictEqual(JSON.parse(captured.init.body).sender.email, 'no-reply@mertilo.com');
+  } finally {
+    global.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.BREVO_API_KEY; else process.env.BREVO_API_KEY = originalApiKey;
+    if (originalFrom === undefined) delete process.env.SMTP_FROM; else process.env.SMTP_FROM = originalFrom;
+  }
+});
+
+test('brevo api provider rejects invalid credentials without hiding the original error', async () => {
+  const originalApiKey = process.env.BREVO_API_KEY;
+  const originalFrom = process.env.SMTP_FROM;
+  const originalFetch = global.fetch;
+
+  process.env.BREVO_API_KEY = 'invalid-brevo-key';
+  process.env.SMTP_FROM = 'no-reply@mertilo.com';
+
+  global.fetch = (async () => ({
+    ok: false,
+    status: 401,
+    text: async () => JSON.stringify({ code: 'unauthorized', message: 'Invalid API key' }),
+  } as any)) as any;
+
+  try {
+    const provider = new BrevoApiEmailProvider();
+    await assert.rejects(() => provider.send({
+      to: 'customer@example.com',
+      subject: 'Confirme seu e-mail — Mertilo',
+      text: 'Código: 123456',
+    }), /Invalid API key|unauthorized/i);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.BREVO_API_KEY; else process.env.BREVO_API_KEY = originalApiKey;
+    if (originalFrom === undefined) delete process.env.SMTP_FROM; else process.env.SMTP_FROM = originalFrom;
+  }
+});
+
+test('email service retries only on safe fallback and prevents duplicate sends after API acceptance', async () => {
+  const originalProvider = process.env.EMAIL_PROVIDER;
+  const originalFallback = process.env.EMAIL_FALLBACK_TO_SMTP;
+  const originalApiKey = process.env.BREVO_API_KEY;
+  const originalSmtpHost = process.env.SMTP_HOST;
+  const originalSmtpPort = process.env.SMTP_PORT;
+  const originalSmtpUser = process.env.SMTP_USER;
+  const originalSmtpPass = process.env.SMTP_PASS;
+  const originalSmtpFrom = process.env.SMTP_FROM;
+  const originalCreateTransport = nodemailer.createTransport;
+  const originalFetch = global.fetch;
+
+  process.env.EMAIL_PROVIDER = 'auto';
+  process.env.EMAIL_FALLBACK_TO_SMTP = 'true';
+  process.env.BREVO_API_KEY = 'test-brevo-key';
+  process.env.SMTP_HOST = 'smtp-relay.brevo.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'brevo-user';
+  process.env.SMTP_PASS = 'brevo-pass';
+  process.env.SMTP_FROM = 'no-reply@mertilo.com';
+
+  let apiCalls = 0;
+  let smtpCalls = 0;
+  global.fetch = (async () => {
+    apiCalls += 1;
+    return {
+      ok: true,
+      status: 202,
+      text: async () => JSON.stringify({ messageId: 'accepted-api-message-id' }),
+    } as any;
+  }) as any;
+
+  (nodemailer as any).createTransport = ((config: any) => {
+    smtpCalls += 1;
+    return {
+      verify: async () => true,
+      sendMail: async (mail: any) => ({ messageId: 'smtp-message-id' }),
+    };
+  }) as any;
+
+  try {
+    const { emailService } = await import('../services/email.service.js');
+    const result = await emailService.sendMail('customer@example.com', 'Confirme seu e-mail', 'Código: 123456');
+
+    assert.strictEqual(result.provider, 'api');
+    assert.strictEqual(apiCalls, 1);
+    assert.strictEqual(smtpCalls, 0);
+  } finally {
+    global.fetch = originalFetch;
+    (nodemailer as any).createTransport = originalCreateTransport;
+    if (originalProvider === undefined) delete process.env.EMAIL_PROVIDER; else process.env.EMAIL_PROVIDER = originalProvider;
+    if (originalFallback === undefined) delete process.env.EMAIL_FALLBACK_TO_SMTP; else process.env.EMAIL_FALLBACK_TO_SMTP = originalFallback;
+    if (originalApiKey === undefined) delete process.env.BREVO_API_KEY; else process.env.BREVO_API_KEY = originalApiKey;
+    if (originalSmtpHost === undefined) delete process.env.SMTP_HOST; else process.env.SMTP_HOST = originalSmtpHost;
+    if (originalSmtpPort === undefined) delete process.env.SMTP_PORT; else process.env.SMTP_PORT = originalSmtpPort;
+    if (originalSmtpUser === undefined) delete process.env.SMTP_USER; else process.env.SMTP_USER = originalSmtpUser;
+    if (originalSmtpPass === undefined) delete process.env.SMTP_PASS; else process.env.SMTP_PASS = originalSmtpPass;
+    if (originalSmtpFrom === undefined) delete process.env.SMTP_FROM; else process.env.SMTP_FROM = originalSmtpFrom;
+  }
+});
+
+test('email service falls back to SMTP only when the API failed before acceptance and fallback is enabled', async () => {
+  const originalProvider = process.env.EMAIL_PROVIDER;
+  const originalFallback = process.env.EMAIL_FALLBACK_TO_SMTP;
+  const originalApiKey = process.env.BREVO_API_KEY;
+  const originalHost = process.env.SMTP_HOST;
+  const originalPort = process.env.SMTP_PORT;
+  const originalUser = process.env.SMTP_USER;
+  const originalPass = process.env.SMTP_PASS;
+  const originalFrom = process.env.SMTP_FROM;
+  const originalSecure = process.env.SMTP_SECURE;
+  const originalCreateTransport = nodemailer.createTransport;
+  const originalFetch = global.fetch;
+
+  process.env.EMAIL_PROVIDER = 'auto';
+  process.env.EMAIL_FALLBACK_TO_SMTP = 'true';
+  process.env.BREVO_API_KEY = 'test-brevo-key';
+  process.env.SMTP_HOST = 'smtp-relay.brevo.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'brevo-user';
+  process.env.SMTP_PASS = 'brevo-pass';
+  process.env.SMTP_FROM = 'no-reply@mertilo.com';
+  process.env.SMTP_SECURE = 'false';
+
+  let smtpSent = false;
+  global.fetch = (async () => {
+    return {
+      ok: false,
+      status: 500,
+      text: async () => JSON.stringify({ message: 'Temporary API outage' }),
+    } as any;
+  }) as any;
+
+  (nodemailer as any).createTransport = ((config: any) => ({
+    verify: async () => true,
+    sendMail: async (mail: any) => {
+      smtpSent = true;
+      return { messageId: 'smtp-fallback-message-id' };
+    },
+  })) as any;
+
+  try {
+    const { emailService } = await import('../services/email.service.js');
+    const result = await emailService.sendMail('customer@example.com', 'Confirme seu e-mail', 'Código: 123456');
+
+    assert.strictEqual(result.provider, 'smtp');
+    assert.strictEqual(smtpSent, true);
+  } finally {
+    global.fetch = originalFetch;
+    (nodemailer as any).createTransport = originalCreateTransport;
+    if (originalProvider === undefined) delete process.env.EMAIL_PROVIDER; else process.env.EMAIL_PROVIDER = originalProvider;
+    if (originalFallback === undefined) delete process.env.EMAIL_FALLBACK_TO_SMTP; else process.env.EMAIL_FALLBACK_TO_SMTP = originalFallback;
+    if (originalApiKey === undefined) delete process.env.BREVO_API_KEY; else process.env.BREVO_API_KEY = originalApiKey;
+    if (originalHost === undefined) delete process.env.SMTP_HOST; else process.env.SMTP_HOST = originalHost;
+    if (originalPort === undefined) delete process.env.SMTP_PORT; else process.env.SMTP_PORT = originalPort;
+    if (originalUser === undefined) delete process.env.SMTP_USER; else process.env.SMTP_USER = originalUser;
+    if (originalPass === undefined) delete process.env.SMTP_PASS; else process.env.SMTP_PASS = originalPass;
+    if (originalFrom === undefined) delete process.env.SMTP_FROM; else process.env.SMTP_FROM = originalFrom;
+    if (originalSecure === undefined) delete process.env.SMTP_SECURE; else process.env.SMTP_SECURE = originalSecure;
   }
 });
 
@@ -130,6 +371,46 @@ test('smtp provider uses SMTP transport when configured', async () => {
     assert.strictEqual(sent.auth.user, 'smtp-user');
     assert.strictEqual(sent.mail.to, 'customer@example.com');
     assert.strictEqual(sent.mail.from, 'no-reply@mertilo.com');
+  } finally {
+    (nodemailer as any).createTransport = originalCreateTransport;
+    if (originalHost === undefined) delete process.env.SMTP_HOST; else process.env.SMTP_HOST = originalHost;
+    if (originalPort === undefined) delete process.env.SMTP_PORT; else process.env.SMTP_PORT = originalPort;
+    if (originalUser === undefined) delete process.env.SMTP_USER; else process.env.SMTP_USER = originalUser;
+    if (originalPass === undefined) delete process.env.SMTP_PASS; else process.env.SMTP_PASS = originalPass;
+    if (originalPassword === undefined) delete process.env.SMTP_PASSWORD; else process.env.SMTP_PASSWORD = originalPassword;
+    if (originalFrom === undefined) delete process.env.SMTP_FROM; else process.env.SMTP_FROM = originalFrom;
+    if (originalSecure === undefined) delete process.env.SMTP_SECURE; else process.env.SMTP_SECURE = originalSecure;
+  }
+});
+
+test('email service surfaces SMTP rejection reason to the caller', async () => {
+  const originalHost = process.env.SMTP_HOST;
+  const originalPort = process.env.SMTP_PORT;
+  const originalUser = process.env.SMTP_USER;
+  const originalPass = process.env.SMTP_PASS;
+  const originalPassword = process.env.SMTP_PASSWORD;
+  const originalFrom = process.env.SMTP_FROM;
+  const originalSecure = process.env.SMTP_SECURE;
+  const originalCreateTransport = nodemailer.createTransport;
+
+  process.env.SMTP_HOST = 'smtp.example.com';
+  process.env.SMTP_PORT = '587';
+  process.env.SMTP_USER = 'smtp-user';
+  process.env.SMTP_PASS = 'smtp-pass';
+  process.env.SMTP_FROM = 'no-reply@mertilo.com';
+  process.env.SMTP_SECURE = 'false';
+
+  (nodemailer as any).createTransport = (() => ({
+    verify: async () => true,
+    sendMail: async () => {
+      throw new Error('Message failed: 550 The gmail.com domain is not verified. Please, add and verify your domain');
+    },
+  })) as any;
+
+  try {
+    await assert.rejects(async () => {
+      await (await import('../services/email.service.js')).emailService.sendMail('customer@example.com', 'Confirme seu e-mail', 'Código: 123456');
+    }, /domain is not verified|Message failed: 550/i);
   } finally {
     (nodemailer as any).createTransport = originalCreateTransport;
     if (originalHost === undefined) delete process.env.SMTP_HOST; else process.env.SMTP_HOST = originalHost;

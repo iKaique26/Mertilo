@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { apiCall } from '../../../services/api/client';
 import { Plus, Trash2, Edit2 } from 'lucide-react';
 
 export function IRPFAssets() {
@@ -30,23 +31,22 @@ export function IRPFAssets() {
     outro: 'Outro',
   };
 
-  // Carregar bens
   useEffect(() => {
-    if (state.currentExerciseId) {
+    if (exerciseId) {
       loadAssets();
     }
-  }, [state.currentExerciseId]);
+  }, [exerciseId]);
 
   async function loadAssets() {
+    if (!exerciseId) return;
+
     try {
       setLoading(true);
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/assets/exercise/${state.currentExerciseId}`
-      );
-      const data = await response.json();
-      setAssets(data || []);
+      const data = await apiCall(`/irpf/assets/exercise/${exerciseId}`);
+      setAssets(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar bens:', error);
+      setAssets([]);
     } finally {
       setLoading(false);
     }
@@ -54,22 +54,19 @@ export function IRPFAssets() {
 
   async function handleAddAsset(e) {
     e.preventDefault();
-    if (!formData.description || !formData.value || !formData.asset_type) {
+    if (!exerciseId || !formData.description || !formData.value || !formData.asset_type) {
       alert('Preencha os campos obrigatórios');
       return;
     }
 
     try {
       const method = editingId ? 'PUT' : 'POST';
-      const endpoint = editingId
-        ? `http://127.0.0.1:5000/api/irpf/assets/${editingId}`
-        : 'http://127.0.0.1:5000/api/irpf/assets';
+      const endpoint = editingId ? `/irpf/assets/${editingId}` : '/irpf/assets';
 
-      const response = await fetch(endpoint, {
+      await apiCall(endpoint, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          exercise_id: state.currentExerciseId,
+          exercise_id: exerciseId,
           asset_type: formData.asset_type,
           description: formData.description,
           value: parseFloat(formData.value),
@@ -79,14 +76,12 @@ export function IRPFAssets() {
         }),
       });
 
-      if (!response.ok) throw new Error('Erro ao salvar bem');
-
       await loadAssets();
       setFormData({ asset_type: 'veiculo', description: '', value: '', location: '' });
       setEditingId(null);
       setShowForm(false);
     } catch (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
@@ -94,14 +89,10 @@ export function IRPFAssets() {
     if (!confirm('Tem certeza?')) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/irpf/assets/${assetId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Erro ao deletar');
+      await apiCall(`/irpf/assets/${assetId}`, { method: 'DELETE' });
       await loadAssets();
     } catch (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
@@ -116,7 +107,7 @@ export function IRPFAssets() {
     setShowForm(true);
   }
 
-  if (!state.currentExerciseId) {
+  if (!exerciseId) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <p style={{ color: 'var(--color-text-secondary)' }}>Selecione um exercício primeiro</p>

@@ -17,15 +17,14 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
     "dev:electron": "concurrently -k \"npm run dev\" \"electron .\" --env ELECTRON_START_URL=http://127.0.0.1:5173",
-    "build": "vite build --outDir ../dist",
+    "build": "vite build --outDir dist",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "preview:5173": "vite preview --host 127.0.0.1 --port 5173",
     "start": "npm run build && electron .",
     "lint": "eslint . --ext .js --ext .jsx",
     "test": "vitest run"
   },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.6.3",
+  "devDependencies": {    "@testing-library/dom": "^10.4.0",    "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@vitejs/plugin-react": "^4.3.3",
     "concurrently": "^8.2.2",

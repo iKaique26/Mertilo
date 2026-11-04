@@ -11,9 +11,11 @@ import historyRouter from './modules/history.js';
 import salaryRouter from './modules/salary.js';
 import vexpensesRouter from './modules/vexpenses.js';
 import irpfRouter from './modules/irpf.js';
+import financialImportRouter from './modules/financial-import.js';
 import authRouter from './routes/auth.js';
 import { readData } from './data/store.js';
 import { logger } from './utils/logger.js';
+import { requireAuth } from './middleware/auth.middleware.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const swaggerDocument = YAML.load(join(__dirname, '..', 'swagger.yaml'));
@@ -46,7 +48,8 @@ app.use((req, _res, next) => {
 });
 app.get('/', (_req, res) => res.json({ status: 'API rodando', timestamp: new Date().toISOString() }));
 app.get('/api/health', (_req, res) => res.json({ status: 'OK', timestamp: new Date().toISOString() }));
-app.get('/api/financas', (_req, res) => res.json(readData()));
+app.get('/api/financas', requireAuth, (_req, res) => res.json(readData()));
+app.use('/api/financas/importacao', financialImportRouter);
 app.use('/api/financas/salario', salaryRouter);
 app.use('/api/financas/contas', accountsRouter);
 app.use('/api/financas/historico', historyRouter);

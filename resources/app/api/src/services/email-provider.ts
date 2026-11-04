@@ -1,3 +1,5 @@
+import nodemailer from 'nodemailer';
+
 export type EmailMessage = {
   to: string;
   subject: string;
@@ -7,12 +9,10 @@ export type EmailMessage = {
   fromName?: string;
 };
 
-import nodemailer from 'nodemailer';
-
 export type EmailResult = {
   accepted?: string[];
   messageId?: string;
-  provider: 'resend' | 'smtp' | 'mock';
+  provider: 'api' | 'smtp' | 'mock';
   simulated?: boolean;
 };
 
@@ -30,6 +30,74 @@ export class MockEmailProvider implements EmailProvider {
       messageId: `mock-${Date.now()}`,
       provider: 'mock',
       simulated: true,
+    };
+  }
+}
+
+export class BrevoApiEmailProvider implements EmailProvider {
+  private readonly apiKey: string;
+  private readonly from: string;
+
+  constructor() {
+    this.apiKey = (process.env.BREVO_API_KEY ?? '').trim();
+    this.from = (process.env.SMTP_FROM ?? process.env.SMTP_FROM_EMAIL ?? '').trim();
+  }
+
+  isConfigured() {
+    return Boolean(this.apiKey && this.from);
+  }
+
+  async send(message: EmailMessage): Promise<EmailResult> {
+    if (!this.isConfigured()) {
+      throw new Error('Configuração da API Brevo incompleta');
+    }
+
+    const payload = {
+      sender: {
+        name: 'Mertilo',
+        email: this.from,
+      },
+      to: [{ email: message.to }],
+      subject: message.subject,
+      htmlContent: message.html ?? message.text,
+      textContent: message.text,
+    };
+
+    let response: Response;
+    try {
+      response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': this.apiKey,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Falha de rede na API Brevo: ${reason}`);
+    }
+
+    let parsed: any = null;
+    const rawText = await response.text();
+    if (rawText) {
+      try {
+        parsed = JSON.parse(rawText);
+      } catch {
+        parsed = { raw: rawText };
+      }
+    }
+
+    if (!response.ok) {
+      const reason = parsed?.message ?? parsed?.code ?? (rawText || `HTTP ${response.status}`);
+      throw new Error(`Falha no envio pela API Brevo: ${reason}`);
+    }
+
+    const messageId = parsed?.messageId ?? `brevo-api-${Date.now()}`;
+    return {
+      accepted: [message.to],
+      messageId,
+      provider: 'api',
     };
   }
 }
@@ -57,7 +125,7 @@ export class SmtpEmailProvider implements EmailProvider {
 
   async send(message: EmailMessage): Promise<EmailResult> {
     if (!this.isConfigured()) {
-      throw new Error('SMTP não configurado');
+      throw new Error('Configuração SMTP do Brevo incompleta');
     }
 
     const transporter = nodemailer.createTransport({
@@ -65,71 +133,27 @@ export class SmtpEmailProvider implements EmailProvider {
       port: this.port,
       secure: this.secure,
       auth: { user: this.user, pass: this.pass },
+      tls: { rejectUnauthorized: true },
     });
 
-    await transporter.verify();
-    const info = await transporter.sendMail({
-      from: this.from,
-      to: message.to,
-      subject: message.subject,
-      text: message.text,
-      html: message.html ?? message.text,
-    });
-
-    return {
-      accepted: [message.to],
-      messageId: info.messageId ?? `smtp-${Date.now()}`,
-      provider: 'smtp',
-    };
-  }
-}
-
-export class ResendEmailProvider implements EmailProvider {
-  private readonly apiKey: string;
-  private readonly fromEmail: string;
-  private readonly fromName: string;
-
-  constructor() {
-    this.apiKey = (process.env.RESEND_API_KEY ?? '').trim();
-    this.fromEmail = (process.env.RESEND_FROM_EMAIL ?? '').trim();
-    this.fromName = (process.env.RESEND_FROM_NAME ?? 'Mertilo').trim() || 'Mertilo';
-  }
-
-  isConfigured() {
-    return Boolean(this.apiKey && this.fromEmail);
-  }
-
-  async send(message: EmailMessage): Promise<EmailResult> {
-    if (!this.isConfigured()) {
-      throw new Error('Resend não configurado');
-    }
-
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        from: `${this.fromName} <${this.fromEmail}>`,
-        to: [message.to],
+    try {
+      await transporter.verify();
+      const info = await transporter.sendMail({
+        from: this.from,
+        to: message.to,
         subject: message.subject,
-        html: message.html ?? message.text,
         text: message.text,
-      }),
-    });
+        html: message.html ?? message.text,
+      });
 
-    if (!response.ok) {
-      const raw = await response.text().catch(() => '');
-      const payload = raw ? `: ${raw.slice(0, 200)}` : '';
-      throw new Error(`Erro ao enviar e-mail pela Resend${payload}`);
+      return {
+        accepted: [message.to],
+        messageId: info.messageId ?? `smtp-${Date.now()}`,
+        provider: 'smtp',
+      };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Falha no envio SMTP: ${reason}`);
     }
-
-    const data = await response.json().catch(() => ({})) as any;
-    return {
-      accepted: [message.to],
-      messageId: data.id ?? data.messageId ?? `resend-${Date.now()}`,
-      provider: 'resend',
-    };
   }
 }

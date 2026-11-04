@@ -3,7 +3,7 @@
   "framework": "vite",
   "installCommand": "npm install",
   "buildCommand": "npm run build --workspace resources/app",
-  "outputDirectory": "dist",
+  "outputDirectory": "resources/app/dist",
   "rewrites": [
     {
       "source": "/(.*)",

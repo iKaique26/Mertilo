@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { apiCall } from '../../../services/api/client';
 import { Plus, Trash2, Edit2 } from 'lucide-react';
 
 export function IRPFDeductions() {
@@ -43,23 +44,22 @@ export function IRPFDeductions() {
     voluntaria: 'Voluntária',
   };
 
-  // Carregar deduções
   useEffect(() => {
-    if (state.currentExerciseId) {
+    if (exerciseId) {
       loadDeductions();
     }
-  }, [state.currentExerciseId]);
+  }, [exerciseId]);
 
   async function loadDeductions() {
+    if (!exerciseId) return;
+
     try {
       setLoading(true);
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/deductions/exercise/${state.currentExerciseId}`
-      );
-      const data = await response.json();
-      setDeductions(data || []);
+      const data = await apiCall(`/irpf/deductions/exercise/${exerciseId}`);
+      setDeductions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar deduções:', error);
+      setDeductions([]);
     } finally {
       setLoading(false);
     }
@@ -67,22 +67,19 @@ export function IRPFDeductions() {
 
   async function handleAddDeduction(e) {
     e.preventDefault();
-    if (!formData.description || !formData.amount || !formData.deduction_type) {
+    if (!exerciseId || !formData.description || !formData.amount || !formData.deduction_type) {
       alert('Preencha os campos obrigatórios');
       return;
     }
 
     try {
       const method = editingId ? 'PUT' : 'POST';
-      const endpoint = editingId
-        ? `http://127.0.0.1:5000/api/irpf/deductions/${editingId}`
-        : 'http://127.0.0.1:5000/api/irpf/deductions';
+      const endpoint = editingId ? `/irpf/deductions/${editingId}` : '/irpf/deductions';
 
-      const response = await fetch(endpoint, {
+      await apiCall(endpoint, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          exercise_id: state.currentExerciseId,
+          exercise_id: exerciseId,
           deduction_type: formData.deduction_type,
           description: formData.description,
           amount: parseFloat(formData.amount),
@@ -92,14 +89,12 @@ export function IRPFDeductions() {
         }),
       });
 
-      if (!response.ok) throw new Error('Erro ao salvar dedução');
-
       await loadDeductions();
       setFormData({ deduction_type: 'saude', description: '', amount: '', category: '' });
       setEditingId(null);
       setShowForm(false);
     } catch (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
@@ -107,14 +102,10 @@ export function IRPFDeductions() {
     if (!confirm('Tem certeza?')) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/irpf/deductions/${dedId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Erro ao deletar');
+      await apiCall(`/irpf/deductions/${dedId}`, { method: 'DELETE' });
       await loadDeductions();
     } catch (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
@@ -129,7 +120,7 @@ export function IRPFDeductions() {
     setShowForm(true);
   }
 
-  if (!state.currentExerciseId) {
+  if (!exerciseId) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <p style={{ color: 'var(--color-text-secondary)' }}>Selecione um exercício primeiro</p>

@@ -13,7 +13,11 @@ export const authController = {
       res.status(201).json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao registrar usuário';
-      return badRequest(res, message);
+      const normalized = message.toLowerCase();
+      const clientMessage = normalized.includes('brevo') || normalized.includes('key not found') || normalized.includes('falha no envio') || normalized.includes('api')
+        ? 'Não foi possível concluir o cadastro. Verifique o e-mail e tente novamente.'
+        : message;
+      return badRequest(res, clientMessage);
     }
   },
 

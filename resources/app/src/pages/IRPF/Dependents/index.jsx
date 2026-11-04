@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { apiCall } from '../../../services/api/client';
 import { Plus, Trash2, Edit2, User } from 'lucide-react';
 
 export function IRPFDependents() {
@@ -30,23 +31,22 @@ export function IRPFDependents() {
     outro: 'Outro',
   };
 
-  // Carregar dependentes
   useEffect(() => {
-    if (state.currentExerciseId) {
+    if (exerciseId) {
       loadDependents();
     }
-  }, [state.currentExerciseId]);
+  }, [exerciseId]);
 
   async function loadDependents() {
+    if (!exerciseId) return;
+
     try {
       setLoading(true);
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/irpf/dependents/exercise/${state.currentExerciseId}`
-      );
-      const data = await response.json();
-      setDependents(data || []);
+      const data = await apiCall(`/irpf/dependents/exercise/${exerciseId}`);
+      setDependents(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar dependentes:', error);
+      setDependents([]);
     } finally {
       setLoading(false);
     }
@@ -56,13 +56,12 @@ export function IRPFDependents() {
     const cleaned = cpf.replace(/\D/g, '');
     if (cleaned.length !== 11) return false;
     if (/^(\d)\1{10}$/.test(cleaned)) return false;
-    // Validação simplificada
     return true;
   }
 
   async function handleAddDependent(e) {
     e.preventDefault();
-    if (!formData.name || !formData.relationship) {
+    if (!exerciseId || !formData.name || !formData.relationship) {
       alert('Preencha os campos obrigatórios');
       return;
     }
@@ -74,15 +73,12 @@ export function IRPFDependents() {
 
     try {
       const method = editingId ? 'PUT' : 'POST';
-      const endpoint = editingId
-        ? `http://127.0.0.1:5000/api/irpf/dependents/${editingId}`
-        : 'http://127.0.0.1:5000/api/irpf/dependents';
+      const endpoint = editingId ? `/irpf/dependents/${editingId}` : '/irpf/dependents';
 
-      const response = await fetch(endpoint, {
+      await apiCall(endpoint, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          exercise_id: state.currentExerciseId,
+          exercise_id: exerciseId,
           name: formData.name,
           cpf: formData.cpf || null,
           birth_date: formData.birth_date || null,
@@ -91,14 +87,12 @@ export function IRPFDependents() {
         }),
       });
 
-      if (!response.ok) throw new Error('Erro ao salvar dependente');
-
       await loadDependents();
       setFormData({ name: '', cpf: '', birth_date: '', relationship: 'filho' });
       setEditingId(null);
       setShowForm(false);
     } catch (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
@@ -106,14 +100,10 @@ export function IRPFDependents() {
     if (!confirm('Tem certeza?')) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/irpf/dependents/${depId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Erro ao deletar');
+      await apiCall(`/irpf/dependents/${depId}`, { method: 'DELETE' });
       await loadDependents();
     } catch (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   }
 
@@ -128,7 +118,7 @@ export function IRPFDependents() {
     setShowForm(true);
   }
 
-  if (!state.currentExerciseId) {
+  if (!exerciseId) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <p style={{ color: 'var(--color-text-secondary)' }}>Selecione um exercício primeiro</p>
