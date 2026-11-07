@@ -11,6 +11,7 @@ export const historyService = {
    * Retorna todo o histórico
    */
   async getAll(userId?: string): Promise<MonthlyHistory[]> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return historyRepository.getAll(userId);
   },
 
@@ -18,6 +19,7 @@ export const historyService = {
    * Retorna um histórico pelo ID
    */
   async getById(id: string, userId?: string): Promise<MonthlyHistory | undefined> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return historyRepository.getById(id, userId);
   },
 
@@ -45,6 +47,7 @@ export const historyService = {
     updates: Partial<Omit<MonthlyHistory, 'id' | 'criadoEm'>>,
     userId?: string
   ): Promise<MonthlyHistory | null> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return historyRepository.update(id, updates, userId);
   },
 
@@ -52,6 +55,7 @@ export const historyService = {
    * Deleta um registro de histórico
    */
   async delete(id: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return historyRepository.delete(id, userId);
   },
 };

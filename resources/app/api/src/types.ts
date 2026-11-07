@@ -42,6 +42,7 @@ export interface VehicleExpense {
 }
 
 export interface ImportedFinancialTransaction {
+  userId: string;
   id: string;
   date: string;
   description: string;
@@ -64,6 +65,7 @@ export interface ImportedFinancialTransaction {
 }
 
 export interface FinancialImportHistoryEntry {
+  userId: string;
   id: string;
   fileName: string;
   importedAt: string;

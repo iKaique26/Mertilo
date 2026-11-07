@@ -64,7 +64,7 @@ export const historyRepository = {
    */
   create(history: Omit<MonthlyHistory, 'id' | 'criadoEm'>, userId?: string): MonthlyHistory {
     const db = getDatabase();
-    const id = Date.now().toString();
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const now = new Date().toISOString();
 
     db.prepare(

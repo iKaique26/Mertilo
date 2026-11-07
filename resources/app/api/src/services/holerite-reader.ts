@@ -267,15 +267,27 @@ function extractField(text: string, pattern: FieldPattern): string | null {
   return null;
 }
 
-function parseCurrency(value: string): number {
-  // Remove R$, spaces, and normalize decimal
-  const normalized = value
-    .replace(/r?\$?\s*/i, '')
-    .replace(/\./g, '') // Remove thousand separator
-    .replace(/,/g, '.'); // Convert comma to dot for parsing
-  
-  const parsed = parseFloat(normalized);
-  return isNaN(parsed) ? 0 : parsed;
+export function parseCurrency(value: string): number {
+  const cleaned = String(value).trim().replace(/r\$\s*/i, '').replace(/\s/g, '');
+  if (!cleaned) return 0;
+
+  const sign = cleaned.startsWith('-') ? -1 : 1;
+  const unsigned = cleaned.replace(/^[+-]/, '');
+  const lastComma = unsigned.lastIndexOf(',');
+  const lastDot = unsigned.lastIndexOf('.');
+  const decimalIndex = lastComma >= 0 && lastDot >= 0
+    ? Math.max(lastComma, lastDot)
+    : lastComma >= 0
+      ? (unsigned.length - lastComma - 1 <= 2 ? lastComma : -1)
+      : lastDot >= 0 && unsigned.length - lastDot - 1 <= 2
+        ? lastDot
+        : -1;
+
+  const normalized = decimalIndex >= 0
+    ? unsigned.slice(0, decimalIndex).replace(/[.,]/g, '') + '.' + unsigned.slice(decimalIndex + 1)
+    : unsigned.replace(/[.,]/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? sign * parsed : 0;
 }
 
 function validateAndCalculateConfidence(data: HoleriteData): void {

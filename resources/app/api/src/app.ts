@@ -13,9 +13,30 @@ import vexpensesRouter from './modules/vexpenses.js';
 import irpfRouter from './modules/irpf.js';
 import financialImportRouter from './modules/financial-import.js';
 import authRouter from './routes/auth.js';
-import { readData } from './data/store.js';
 import { logger } from './utils/logger.js';
 import { requireAuth } from './middleware/auth.middleware.js';
+import { accountService } from './services/account.service.js';
+import { categoryService } from './services/category.service.js';
+import { historyService } from './services/history.service.js';
+import { salaryService } from './services/salary.service.js';
+import { vehicleExpenseService } from './services/vehicle-expense.service.js';
+import { readUserData } from './data/store.js';
+function buildFinancialSummary(data: any, contas: any[], salario: number) {
+  const transactions = Array.isArray(data.importedTransactions) ? data.importedTransactions : [];
+  const importedIncome = transactions.filter((item: any) => item.type === 'entrada').reduce((sum: number, item: any) => sum + (Number(item.value) || 0), 0);
+  const importedExpenses = transactions.filter((item: any) => item.type === 'saída').reduce((sum: number, item: any) => sum + Math.abs(Number(item.value) || 0), 0);
+  const accountBalance = contas.reduce((sum: number, item: any) => sum + (Number(item.valor) || 0), 0);
+  const byCategory = new Map<string, number>();
+  for (const item of transactions) {
+    if (item.type !== 'saída') continue;
+    const name = item.category || 'Não categorizado';
+    byCategory.set(name, (byCategory.get(name) || 0) + Math.abs(Number(item.value) || 0));
+  }
+  const categories = Array.from(byCategory, ([nome, gasto], index) => ({ id: `imported-${index}-${nome}`, nome, cor: '#6366F1', percentual: 0, gasto }));
+  const recentActivity = [...transactions.map((item: any) => ({ id: item.id, type: 'transaction', date: item.date || item.importedAt, description: item.description, value: item.value, category: item.category })), ...((data.importHistory || []).map((item: any) => ({ id: item.id, type: 'import', date: item.importedAt, description: item.fileName, value: item.summary?.imported || 0 })))]
+    .sort((a: any, b: any) => String(b.date).localeCompare(String(a.date))).slice(0, 10);
+  return { summary: { saldoTotal: accountBalance + importedIncome - importedExpenses, receitaTotal: salario + importedIncome, despesasImportadas: importedExpenses, gastosPorCategoria: categories, atividadeRecente: recentActivity } };
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const swaggerDocument = YAML.load(join(__dirname, '..', 'swagger.yaml'));
@@ -48,7 +69,38 @@ app.use((req, _res, next) => {
 });
 app.get('/', (_req, res) => res.json({ status: 'API rodando', timestamp: new Date().toISOString() }));
 app.get('/api/health', (_req, res) => res.json({ status: 'OK', timestamp: new Date().toISOString() }));
-app.get('/api/financas', requireAuth, (_req, res) => res.json(readData()));
+app.get('/api/financas', requireAuth, async (req, res, next) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: 'Invalid session' });
+    const data = readUserData(userId);
+    if (!Array.isArray(data.importHistory) || !Array.isArray(data.importedTransactions) || !Array.isArray(data.categorias) || !Array.isArray(data.historico)) {
+      return res.status(500).json({ error: 'Dados financeiros inválidos' });
+    }
+    const [contas, categorias, historico, salario, vexpenses] = await Promise.all([
+      accountService.getAll(userId),
+      categoryService.getAll(userId),
+      historyService.getAll(userId),
+      salaryService.get(userId),
+      vehicleExpenseService.getAll(userId),
+    ]);
+    const importHistory = data.importHistory.filter((entry: any) => entry?.userId === userId);
+    const importedTransactions = data.importedTransactions.filter((entry: any) => entry?.userId === userId);
+    const summary = buildFinancialSummary({ ...data, importHistory, importedTransactions }, contas, salario);
+    res.json({
+      salario,
+      contas,
+      categorias: [...categorias, ...summary.summary.gastosPorCategoria],
+      historico,
+      vexpenses,
+      importHistory,
+      importedTransactions,
+      summary: summary.summary,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 app.use('/api/financas/importacao', financialImportRouter);
 app.use('/api/financas/salario', salaryRouter);
 app.use('/api/financas/contas', accountsRouter);

@@ -1,0 +1,152 @@
+{
+  "salario": 0,
+  "contas": [],
+  "categorias": [
+    {
+      "id": "1",
+      "nome": "Moradia",
+      "cor": "#7C3AED",
+      "percentual": 0.3
+    },
+    {
+      "id": "2",
+      "nome": "Alimentação",
+      "cor": "#6366F1",
+      "percentual": 0.15
+    },
+    {
+      "id": "3",
+      "nome": "Transporte",
+      "cor": "#001F54",
+      "percentual": 0.1
+    },
+    {
+      "id": "4",
+      "nome": "Saúde",
+      "cor": "#10B981",
+      "percentual": 0.1
+    },
+    {
+      "id": "5",
+      "nome": "Educação",
+      "cor": "#F59E0B",
+      "percentual": 0.05
+    },
+    {
+      "id": "6",
+      "nome": "Compras",
+      "cor": "#F97316",
+      "percentual": 0.08
+    },
+    {
+      "id": "7",
+      "nome": "Assinaturas e serviços digitais",
+      "cor": "#EC4899",
+      "percentual": 0.06
+    },
+    {
+      "id": "8",
+      "nome": "Lazer e entretenimento",
+      "cor": "#8B5CF6",
+      "percentual": 0.04
+    },
+    {
+      "id": "9",
+      "nome": "Viagens",
+      "cor": "#14B8A6",
+      "percentual": 0.04
+    },
+    {
+      "id": "10",
+      "nome": "Impostos",
+      "cor": "#F43F5E",
+      "percentual": 0.04
+    },
+    {
+      "id": "11",
+      "nome": "Salário e outras receitas",
+      "cor": "#22C55E",
+      "percentual": 0.18
+    },
+    {
+      "id": "12",
+      "nome": "Investimentos e aplicações",
+      "cor": "#0EA5E9",
+      "percentual": 0.05
+    },
+    {
+      "id": "13",
+      "nome": "Não categorizado",
+      "cor": "#94A3B8",
+      "percentual": 0.05
+    }
+  ],
+  "historico": [
+    {
+      "id": "monthly-2026-10",
+      "mes": "2026-10",
+      "salario": 0,
+      "totalContas": 0,
+      "saldoDisponivel": 3300,
+      "distribuicao": [],
+      "totalExtras": 0,
+      "rendaTotal": 3300,
+      "extras": [],
+      "criadoEm": "2026-11-06T18:53:58.810Z"
+    }
+  ],
+  "vexpenses": [],
+  "importHistory": [
+    {
+      "id": "import-1793991238804",
+      "fileName": "single.csv",
+      "importedAt": "2026-11-06T18:53:58.804Z",
+      "summary": {
+        "total": 1,
+        "imported": 1,
+        "duplicates": 0,
+        "invalid": 0,
+        "toReview": 0
+      },
+      "transactions": [
+        {
+          "id": "single-2",
+          "date": "2026-10-05",
+          "description": "Salário",
+          "normalizedDescription": "salario",
+          "originalDescription": "Salário",
+          "value": 3300,
+          "type": "entrada",
+          "category": "Salário e outras receitas",
+          "subcategory": "Salário",
+          "confidence": 0.96,
+          "source": "single.csv",
+          "status": "importado",
+          "line": 3,
+          "importSource": "csv_import",
+          "importedAt": "2026-10-12T00:00:00.000Z"
+        }
+      ]
+    }
+  ],
+  "importedTransactions": [
+    {
+      "id": "single-2",
+      "date": "2026-10-05",
+      "description": "Salário",
+      "normalizedDescription": "salario",
+      "originalDescription": "Salário",
+      "value": 3300,
+      "type": "entrada",
+      "category": "Salário e outras receitas",
+      "subcategory": "Salário",
+      "confidence": 0.96,
+      "source": "single.csv",
+      "status": "importado",
+      "line": 3,
+      "importSource": "csv_import",
+      "importedAt": "2026-10-12T00:00:00.000Z",
+      "duplicateHash": "global::2026-10-05::3300.00::salario"
+    }
+  ]
+}

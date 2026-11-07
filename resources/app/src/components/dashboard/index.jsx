@@ -64,35 +64,35 @@ export function HeroCard({ saldo }) {
 /**
  * Grade de cards de estatísticas com ícones
  */
-export function StatsGrid({ salario, totalFixos, rendaTotal, gastoMedio }) {
+export function StatsGrid({ salario, totalFixos, rendaTotal, gastoMedio, totalExpenses, saldo }) {
   const stats = [
     {
-      label: "Salário",
+      label: "Entradas",
       value: salario,
-      Icon: DollarSign,
-      description: "Receita principal",
-      highlighted: true,
-    },
-    {
-      label: "Contas fixas",
-      value: totalFixos,
-      Icon: Wallet,
-      description: "Despesas recorrentes",
-      highlighted: false,
-    },
-    {
-      label: "Renda total",
-      value: rendaTotal,
       Icon: TrendingUp,
-      description: "Últimos 3 meses",
-      highlighted: false,
+      description: "Receita total do mês",
+      tone: "positive",
+    },
+    {
+      label: "Saídas",
+      value: -Math.abs(totalExpenses || totalFixos),
+      Icon: TrendingDown,
+      description: "Despesas totais do mês",
+      tone: "negative",
+    },
+    {
+      label: "Saldo",
+      value: saldo,
+      Icon: Wallet,
+      description: "Receita menos despesas",
+      tone: saldo >= 0 ? "positive" : "negative",
     },
     {
       label: "Gasto médio",
       value: gastoMedio,
       Icon: TrendingDown,
       description: "Por mês",
-      highlighted: false,
+      tone: "negative",
     },
   ];
 
@@ -101,7 +101,7 @@ export function StatsGrid({ salario, totalFixos, rendaTotal, gastoMedio }) {
       {stats.map((stat) => (
         <article
           key={stat.label}
-          className={`stat-card ${stat.highlighted ? "accent" : ""}`}
+          className={`stat-card ${stat.tone || ''}`}
         >
           <div className="stat-header">
             <div className="stat-label">
@@ -129,7 +129,10 @@ export function CategoryDistribution({ categories }) {
     return null;
   }
 
-  const maxValue = Math.max(...categories.map((c) => c.gasto || 0));
+  const ranked = [...categories].sort((a, b) => Number(b.gasto) - Number(a.gasto));
+  const topIds = new Set(ranked.slice(0, 3).map((category) => category.id));
+  const maxValue = Math.max(...categories.map((c) => Number(c.gasto) || 0));
+  const total = categories.reduce((sum, category) => sum + (Number(category.gasto) || 0), 0);
 
   return (
     <section className="panel">
@@ -141,11 +144,15 @@ export function CategoryDistribution({ categories }) {
       </div>
 
       <div className="category-list">
-        {categories.map((category) => {
-          const percentage = maxValue ? (category.gasto / maxValue) * 100 : 0;
+        {ranked.map((category) => {
+          const gasto = Number(category.gasto) || 0;
+          const percentage = maxValue ? (gasto / maxValue) * 100 : 0;
+          const share = total ? (gasto / total) * 100 : 0;
+          const isTop = topIds.has(category.id);
 
           return (
-            <div key={category.id} className="category-row">
+            <div key={category.id} className={`category-row ${isTop ? 'category-row-top' : ''}`}>
+              {isTop && <span className="category-rank">Top {ranked.indexOf(category) + 1}</span>}
               <div className="category-info">
                 <div className="category-label">
                   <span
@@ -155,7 +162,7 @@ export function CategoryDistribution({ categories }) {
                   />
                   <strong>{category.nome}</strong>
                 </div>
-                <small>{category.gasto ? formatCurrency(category.gasto) : "R$ 0,00"}</small>
+                <small>{gasto ? formatCurrency(gasto) : "R$ 0,00"} · {share.toFixed(1)}%</small>
               </div>
               <div className="category-progress-wrap">
                 <div

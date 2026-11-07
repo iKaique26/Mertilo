@@ -11,6 +11,7 @@ export const accountService = {
    * Retorna todas as contas
    */
   async getAll(userId?: string): Promise<Account[]> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return accountRepository.getAll(userId);
   },
 
@@ -18,6 +19,7 @@ export const accountService = {
    * Retorna uma conta pelo ID
    */
   async getById(id: string, userId?: string): Promise<Account | undefined> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return accountRepository.getById(id, userId);
   },
 
@@ -31,6 +33,7 @@ export const accountService = {
     isFixed?: boolean
   , userId?: string
   ): Promise<Account> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     // Validações de negócio
     if (!nome || nome.trim() === '') {
       throw new Error('Nome da conta é obrigatório');
@@ -56,6 +59,7 @@ export const accountService = {
     updates: Partial<Omit<Account, 'id' | 'data'>>
   , userId?: string
   ): Promise<Account | null> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     // Validações de negócio
     if (updates.nome !== undefined && (!updates.nome || updates.nome.trim() === '')) {
       throw new Error('Nome inválido');
@@ -72,6 +76,7 @@ export const accountService = {
    * Deleta uma conta
    */
   async delete(id: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return accountRepository.delete(id, userId);
   },
 };

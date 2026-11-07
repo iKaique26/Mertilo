@@ -22,6 +22,7 @@ import {
 import { TrendingUp, PlusCircle } from 'lucide-react';
 
 const PERIOD_STORAGE_KEY = 'mertilo_selected_period';
+const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
 
 function getStoredPeriod() {
   if (typeof window === 'undefined') return 'month';
@@ -58,8 +59,11 @@ function filterHistoryByPeriod(history, period) {
   return safeEntries.slice(-1);
 }
 
-function buildSavingsRecommendations({ salario, contas, categories, history }) {
+function buildSavingsRecommendations({ salario, contas, categories, history, totalExpenses, balance }) {
   const fixedExpenses = (contas || []).filter((item) => item.isFixed).reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+  const mainCategory = [...(categories || [])].sort((a, b) => Number(b.gasto) - Number(a.gasto))[0];
+  const targetedCategory = (categories || []).find((category) => ['Lazer', 'Assinaturas e serviços digitais', 'Compras'].some((name) => category.nome?.toLowerCase().includes(name.toLowerCase())) && Number(category.gasto) > 0);
+  const targetedPercent = targetedCategory && salario > 0 ? (Number(targetedCategory.gasto) / salario) * 100 : 0;
   const totalHistory = (history || []).reduce((sum, item) => sum + (Number(item.totalContas) || 0), 0);
   const avgSpent = history && history.length ? totalHistory / history.length : fixedExpenses;
   const highestCategory = (categories || []).reduce((best, category) => {
@@ -71,6 +75,28 @@ function buildSavingsRecommendations({ salario, contas, categories, history }) {
   }, null);
 
   const recommendations = [];
+
+  if (targetedCategory && targetedPercent > 15) {
+    recommendations.push({
+      title: 'Dica de economia',
+      description: `Atenção: seus gastos com ${targetedCategory.nome} estão em ${targetedPercent.toFixed(1)}% da sua renda. Que tal revisar suas assinaturas?`,
+      value: 'Revisar',
+    });
+  }
+
+  if (totalExpenses > salario && mainCategory) {
+    recommendations.push({
+      title: 'Alerta de orçamento',
+      description: `Alerta: Você gastou mais do que ganhou este mês. Reveja seus gastos com ${mainCategory.nome}.`,
+      value: 'Atenção',
+    });
+  } else if (balance > 0) {
+    recommendations.push({
+      title: 'Boa evolução',
+      description: `Parabéns! Você economizou ${formatCurrency(balance)} este mês. Considere investir esse valor.`,
+      value: 'Investir',
+    });
+  }
 
   if (salario && fixedExpenses > salario * 0.45) {
     recommendations.push({
@@ -144,24 +170,28 @@ export function Dashboard() {
   }
 
   // Extrair dados
-  const salario = Number(state.salario) || 0;
+  const summary = state.summary || {};
+  const salario = Number(summary.receitaTotal ?? state.salario) || 0;
   const contas = state.accounts || [];
-  const categorias = state.categories || [];
+  const categorias = summary.gastosPorCategoria?.length ? summary.gastosPorCategoria : state.categories || [];
   const historico = state.history || [];
   const historicoFiltrado = filterHistoryByPeriod(historico, selectedPeriod);
-  const recommendations = buildSavingsRecommendations({
-    salario,
-    contas,
-    categories: categorias,
-    history: historicoFiltrado,
-  });
 
   // Calcular métricas
   const totalFixos = contas.reduce(
     (sum, item) => sum + (Number(item.valor) || 0),
     0
   );
-  const saldo = salario - totalFixos;
+  const saldo = Number(summary.saldoTotal ?? (salario - totalFixos));
+  const totalExpenses = Number(summary.despesaTotal ?? summary.totalDespesas ?? totalFixos) || 0;
+  const recommendations = buildSavingsRecommendations({
+    salario,
+    contas,
+    categories: categorias,
+    history: historicoFiltrado,
+    totalExpenses,
+    balance: saldo,
+  });
   const gastoMedio =
     historicoFiltrado.length
       ? historicoFiltrado.reduce(
@@ -180,6 +210,7 @@ export function Dashboard() {
   const temContas = contas.length > 0;
   const temCategorias = categorias.length > 0;
   const temHistorico = historico.length > 0;
+  const atividadeRecente = summary.atividadeRecente || [];
 
   return (
     <>
@@ -201,7 +232,15 @@ export function Dashboard() {
         totalFixos={totalFixos}
         rendaTotal={rendaTotal}
         gastoMedio={gastoMedio}
+        totalExpenses={totalExpenses}
+        saldo={saldo}
       />
+
+      {categorias.length > 0 && (() => {
+        const maior = [...categorias].sort((a, b) => Number(b.gasto) - Number(a.gasto))[0];
+        const share = salario > 0 ? (Number(maior?.gasto || 0) / salario) * 100 : 0;
+        return <div className="expense-highlight"><strong>Sua maior despesa no mês foi com {maior?.nome}: {formatCurrency(maior?.gasto)}</strong><span>{share.toFixed(1)}% da sua renda</span></div>;
+      })()}
 
       {/* Seção de gráficos e categorias */}
       <section className="content-grid">
@@ -236,6 +275,21 @@ export function Dashboard() {
             />
           </div>
         )}
+      </section>
+
+      <section className="panel" style={{ marginTop: '2rem' }}>
+        <div className="panel-header">
+          <div>
+            <h3>Atividade recente</h3>
+            <small>Importações e movimentações</small>
+          </div>
+        </div>
+        {atividadeRecente.length ? atividadeRecente.slice(0, 5).map((item) => (
+          <div className="history-row" key={`${item.type}-${item.id}`}>
+            <div><strong>{item.description || item.category || 'Movimentação'}</strong><small>{item.date ? new Date(item.date).toLocaleDateString('pt-BR') : ''}</small></div>
+            <strong className={Number(item.value) >= 0 ? 'positive' : 'negative'}>{formatCurrency(item.value)}</strong>
+          </div>
+        )) : <EmptyState title="Nenhuma atividade recente" message="Importe movimentações para acompanhar seu fluxo financeiro." />}
       </section>
 
       <section className="panel" style={{ marginTop: '2rem' }}>

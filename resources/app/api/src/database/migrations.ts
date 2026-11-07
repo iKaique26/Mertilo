@@ -92,6 +92,14 @@ const migrations: Record<string, string> = {
     CREATE INDEX IF NOT EXISTS idx_vehicle_expenses_tipo_trajeto ON vehicle_expenses(tipo_trajeto);
   `,
 
+  '003_financial_ownership_indexes': `
+    CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);
+    CREATE INDEX IF NOT EXISTS idx_monthly_history_user_id ON monthly_history(user_id);
+    CREATE INDEX IF NOT EXISTS idx_vehicle_expenses_user_id ON vehicle_expenses(user_id);
+    CREATE INDEX IF NOT EXISTS idx_salary_config_user_id ON salary_config(user_id);
+  `,
+
   '003_irpf_schema': `
     -- Tabela de exercícios fiscais
     CREATE TABLE IF NOT EXISTS irpf_exercises (
@@ -474,13 +482,17 @@ export function runMigrations(db: Database.Database): void {
     if (pending.length === 0) {
       ensureLegacyUserColumns(db);
       logger.info('✅ Banco de dados já está atualizado');
+      logger.info(`🌐 Site/API rodando em: http://localhost:${process.env.PORT || 3000}`);
       return;
     }
 
     logger.info(`📋 ${pending.length} migration(s) pendente(s)`);
 
+    // Adiciona colunas de ownership antes dos índices que dependem delas.
     for (const migration of pending) {
       executeMigration(db, migration);
+      // 001 creates financial tables; add nullable ownership before 003 indexes.
+      if (migration === '001_initial_schema') ensureLegacyUserColumns(db);
     }
 
     ensureLegacyUserColumns(db);

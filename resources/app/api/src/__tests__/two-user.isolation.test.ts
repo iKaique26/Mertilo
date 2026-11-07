@@ -137,6 +137,12 @@ test('User B cannot access or modify User A resources', async () => {
   await assertNoAccess('PUT', `/categories/${idsA.category}`, idsA.category);
   await assertNoAccess('DELETE', `/categories/${idsA.category}`, idsA.category);
 
+  await assertNoAccess('GET', `/irpf/exercises/${idsA.exercise}`, idsA.exercise);
+  await assertNoAccess('PUT', `/irpf/exercises/${idsA.exercise}`, idsA.exercise);
+
+  const missingExercise = await api('/irpf/exercises/nonexistent-exercise', { method: 'GET', headers: bHeaders });
+  assert.notStrictEqual(missingExercise.status, 200);
+
   await assertNoAccess('GET', `/irpf/documents/${idsA.document}`, idsA.document);
   await assertNoAccess('PUT', `/irpf/documents/${idsA.document}`, idsA.document);
   await assertNoAccess('DELETE', `/irpf/documents/${idsA.document}`, idsA.document);

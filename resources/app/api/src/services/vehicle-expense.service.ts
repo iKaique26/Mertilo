@@ -11,6 +11,7 @@ export const vehicleExpenseService = {
    * Retorna todas as despesas de veículo
    */
   async getAll(userId?: string): Promise<VehicleExpense[]> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return vehicleExpenseRepository.getAll(userId);
   },
 
@@ -18,6 +19,7 @@ export const vehicleExpenseService = {
    * Retorna uma despesa pelo ID
    */
   async getById(id: string, userId?: string): Promise<VehicleExpense | undefined> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return vehicleExpenseRepository.getById(id, userId);
   },
 
@@ -77,6 +79,7 @@ export const vehicleExpenseService = {
    * Deleta uma despesa de veículo
    */
   async delete(id: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return vehicleExpenseRepository.delete(id, userId);
   },
 };

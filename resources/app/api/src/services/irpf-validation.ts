@@ -55,13 +55,31 @@ export class IRPFValidationService {
     // Low confidence and missing identification
     for (const d of documents) {
       if (d.confidence_score && d.confidence_score < 70) {
-        documentChecks.push({ id: `lowconf_${d.id}`, type: 'low_confidence', severity: 'high', title: 'Documento com baixa confiança', description: `${d.filename} foi extraído com ${d.confidence_score}% de confiança.`, relatedDocumentId: d.id });
+        const entry = { id: `lowconf_${d.id}`, type: 'low_confidence', severity: 'high', title: 'Documento com baixa confiança', description: `${d.filename} foi extraído com ${d.confidence_score}% de confiança.`, relatedDocumentId: d.id };
+        documentChecks.push(entry);
+        validationsRepository.upsert(exerciseId, deterministicKey('low_confidence', d.id), {
+          type: entry.type,
+          severity: entry.severity,
+          title: entry.title,
+          description: entry.description,
+          status: 'PENDING',
+          source_document_id: d.id,
+        });
       }
 
       try {
         const parsed = safeParse(d.extracted_data);
         if (!parsed || Object.keys(parsed).length === 0) {
-          documentChecks.push({ id: `noid_${d.id}`, type: 'no_identification', severity: 'medium', title: 'Documento sem identificação suficiente', description: `${d.filename} não contém campos identificáveis.` , relatedDocumentId: d.id });
+          const entry = { id: `noid_${d.id}`, type: 'no_identification', severity: 'medium', title: 'Documento sem identificação suficiente', description: `${d.filename} não contém campos identificáveis.` , relatedDocumentId: d.id };
+          documentChecks.push(entry);
+          validationsRepository.upsert(exerciseId, deterministicKey('no_identification', d.id), {
+            type: entry.type,
+            severity: entry.severity,
+            title: entry.title,
+            description: entry.description,
+            status: 'PENDING',
+            source_document_id: d.id,
+          });
         }
       } catch {}
     }

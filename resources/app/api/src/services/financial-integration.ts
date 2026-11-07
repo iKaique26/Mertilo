@@ -15,15 +15,6 @@ export const financialIntegrationService = {
     try {
       const db = getDatabase();
 
-      // Verificar se já existe linkage
-      const existing = db
-        .prepare('SELECT id FROM irpf_financial_linkage WHERE irpf_income_id = ?')
-        .get(incomeId);
-
-      if (existing) {
-        return (existing as any).id;
-      }
-
       // Obter dados do rendimento
       const income = db.prepare('SELECT * FROM irpf_income WHERE id = ?').get(incomeId) as any;
       if (!income) throw new Error('Rendimento não encontrado');
@@ -33,6 +24,11 @@ export const financialIntegrationService = {
         const owner = db.prepare('SELECT user_id FROM irpf_exercises WHERE id = ?').get(income.exercise_id) as any;
         if (!owner || owner.user_id !== userId) throw new Error('Acesso negado ao rendimento');
       }
+
+      const existing = db
+        .prepare('SELECT id FROM irpf_financial_linkage WHERE irpf_income_id = ?')
+        .get(incomeId);
+      if (existing) return (existing as any).id;
 
       // Obter histórico financeiro para validação
       const financialHistory = db

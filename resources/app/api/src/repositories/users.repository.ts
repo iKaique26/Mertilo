@@ -66,32 +66,6 @@ export const usersRepository = {
     return row ? Number(row.c) : 0;
   },
 
-  // Assign existing legacy rows (without user_id) to the provided user id.
-  // This is best-effort and only used for first-user bootstrap in single-user installs or tests.
-  assignLegacyDataToUser(userId: string) {
-    const db = getDatabase();
-    const tables = [
-      'accounts',
-      'irpf_exercises',
-      'irpf_documents',
-      'irpf_income',
-      'irpf_assets',
-      'irpf_deductions',
-      'irpf_dependents',
-      'irpf_alerts'
-    ];
-    const tx = db.transaction(() => {
-      for (const t of tables) {
-        try {
-          db.prepare(`UPDATE ${t} SET user_id = ? WHERE user_id IS NULL OR user_id = ''`).run(userId);
-        } catch (err) {
-          // ignore tables that don't exist in older DBs
-        }
-      }
-    });
-    tx();
-  },
-
   // Verification codes
   createVerificationCode(userId: string, codeHash: string, expiresAt: string) {
     const db = getDatabase();

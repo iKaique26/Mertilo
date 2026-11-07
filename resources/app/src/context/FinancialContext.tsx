@@ -20,6 +20,7 @@ const initialState: FinancialState = {
   vehicleExpenses: [],
   importHistory: [],
   importedTransactions: [],
+  summary: null,
   loading: true,
   error: null,
   selectedCategory: null,
@@ -49,6 +50,7 @@ function financialReducer(
         vehicleExpenses: action.payload.vexpenses,
         importHistory: action.payload.importHistory || [],
         importedTransactions: action.payload.importedTransactions || [],
+        summary: action.payload.summary || null,
         loading: false,
         error: null,
       };

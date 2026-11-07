@@ -4,7 +4,7 @@
  */
 
 import Database from 'better-sqlite3';
-import { readData } from '../data/store.js';
+import { readLegacyData } from '../data/store.js';
 import { logger } from '../utils/logger.js';
 import type { AppData } from '../types.js';
 
@@ -69,7 +69,8 @@ export function migrateJsonToSqlite(db: Database.Database): void {
 
   try {
     // Ler dados JSON
-    const jsonData = readData();
+    // Maintenance migration only. Authenticated routes never call this path.
+    const jsonData = readLegacyData();
     const statsBefore = {
       ...getJsonStats(jsonData),
       salary: { before: jsonData.salario > 0 ? 1 : 0, after: 0 },

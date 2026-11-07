@@ -4,7 +4,7 @@
 
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { FinancialProvider } from './context/FinancialContext';
-import { TaxProvider } from './context/TaxIRPFContext';
+import { TaxProvider } from './modules/irpf';
 import { AuthProvider } from './context/AuthContext';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
@@ -18,15 +18,15 @@ import { Transactions } from './pages/Transactions';
 import { Accounts } from './pages/Accounts';
 import { Categories } from './pages/Categories';
 import { ImportacaoFinanceira } from './pages/ImportacaoFinanceira';
-import { IRPF } from './pages/IRPF';
-import { IRPFAssistant } from './pages/IRPF/Assistant';
-import { IRPFDocuments } from './pages/IRPF/Documents';
-import { IRPFIncome } from './pages/IRPF/Income';
-import { IRPFAssets } from './pages/IRPF/Assets';
-import { IRPFDependents } from './pages/IRPF/Dependents';
-import { IRPFDeductions } from './pages/IRPF/Deductions';
-import { IRPFAlerts } from './pages/IRPF/Alerts';
-import { IRPFReview } from './pages/IRPF/Review';
+import { IRPF } from './modules/irpf';
+import { IRPFAssistant } from './modules/irpf/pages/Assistant';
+import { IRPFDocuments } from './modules/irpf/pages/Documents';
+import { IRPFIncome } from './modules/irpf/pages/Income';
+import { IRPFAssets } from './modules/irpf/pages/Assets';
+import { IRPFDependents } from './modules/irpf/pages/Dependents';
+import { IRPFDeductions } from './modules/irpf/pages/Deductions';
+import { IRPFAlerts } from './modules/irpf/pages/Alerts';
+import { IRPFReview } from './modules/irpf/pages/Review';
 
 export function App() {
   return (

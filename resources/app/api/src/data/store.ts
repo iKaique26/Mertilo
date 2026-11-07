@@ -12,6 +12,7 @@ const DATA_DIR = process.env.MERTILO_DATA_DIR
 const DATA_FILE = path.join(DATA_DIR, 'data.json');
 const LEGACY_DATA_FILE = process.env.MERTILO_LEGACY_DATA_FILE;
 const TEMP_DATA_FILE = `${DATA_FILE}.tmp`;
+const OWNER_NAMESPACE_KEY = 'ownerData';
 
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: '1', nome: 'Moradia', cor: '#7C3AED', percentual: 0.3 },
@@ -52,6 +53,13 @@ function normalizeData(value: Partial<AppData>): AppData {
   };
 }
 
+type OwnerData = Record<string, AppData>;
+
+function normalizeOwnerData(value: unknown): OwnerData {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([userId, data]) => [userId, normalizeData(data as Partial<AppData>)]));
+}
+
 function ensureDataFile(): void {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(DATA_FILE)) {
@@ -63,7 +71,8 @@ function ensureDataFile(): void {
   }
 }
 
-export function readData(): AppData {
+/** Legacy-only read for one-time JSON → SQLite maintenance migration. */
+export function readLegacyData(): AppData {
   ensureDataFile();
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf8');
@@ -82,7 +91,8 @@ export function readData(): AppData {
   }
 }
 
-export function writeData(data: AppData): void {
+/** Legacy-only write kept for maintenance tooling; never use in authenticated request paths. */
+export function writeLegacyData(data: AppData): void {
   ensureDataFile();
   if (fs.existsSync(DATA_FILE)) {
     createBackup(DATA_FILE);
@@ -92,4 +102,52 @@ export function writeData(data: AppData): void {
   const serialized = JSON.stringify(normalized, null, 2);
   fs.writeFileSync(TEMP_DATA_FILE, serialized, 'utf8');
   fs.renameSync(TEMP_DATA_FILE, DATA_FILE);
+}
+
+function testStorageFailure(stage: 'read' | 'write-before' | 'write-after-temp' | 'rename'): void {
+  if (process.env.NODE_ENV === 'test' && process.env.MERTILO_TEST_STORAGE_FAILURE === stage) {
+    throw new Error(`Falha de armazenamento injetada: ${stage}`);
+  }
+}
+
+function readRawObject(): Record<string, unknown> {
+  ensureDataFile();
+  testStorageFailure('read');
+  const raw = fs.readFileSync(DATA_FILE, 'utf8');
+  const parsed = JSON.parse(raw);
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+}
+
+function writeRawObject(value: Record<string, unknown>): void {
+  ensureDataFile();
+  testStorageFailure('write-before');
+  if (fs.existsSync(DATA_FILE)) createBackup(DATA_FILE);
+
+  try {
+    fs.writeFileSync(TEMP_DATA_FILE, JSON.stringify(value, null, 2), 'utf8');
+    testStorageFailure('write-after-temp');
+    testStorageFailure('rename');
+    fs.renameSync(TEMP_DATA_FILE, DATA_FILE);
+  } catch (error) {
+    try {
+      if (fs.existsSync(TEMP_DATA_FILE)) fs.rmSync(TEMP_DATA_FILE, { force: true });
+    } catch (cleanupError) {
+      logger.error('Não foi possível limpar arquivo temporário:', cleanupError);
+    }
+    throw error;
+  }
+}
+
+export function readUserData(userId: string | undefined): AppData {
+  if (!userId) throw new Error('Contexto de usuário obrigatório.');
+  const raw = readRawObject();
+  return normalizeData(normalizeOwnerData(raw[OWNER_NAMESPACE_KEY])[userId] || {});
+}
+
+export function writeUserData(userId: string | undefined, data: AppData): void {
+  if (!userId) throw new Error('Contexto de usuário obrigatório.');
+  const raw = readRawObject();
+  const owners = normalizeOwnerData(raw[OWNER_NAMESPACE_KEY]);
+  owners[userId] = normalizeData(data);
+  writeRawObject({ ...raw, [OWNER_NAMESPACE_KEY]: owners });
 }

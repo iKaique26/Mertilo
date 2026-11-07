@@ -3,6 +3,9 @@
  */
 
 import { useLocation, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useFinancial } from '../../hooks/useFinancial';
+import { Menu, X } from 'lucide-react';
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -12,8 +15,13 @@ import {
   Upload,
 } from 'lucide-react';
 
+const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
+
 export function Sidebar() {
   const location = useLocation();
+  const { state } = useFinancial();
+  const [open, setOpen] = useState(false);
+  const saldoTotal = state.summary?.saldoTotal ?? 0;
 
   const navItems = [
     {
@@ -55,7 +63,12 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="sidebar" role="navigation" aria-label="Navegação principal">
+    <>
+      <button className="mobile-menu-toggle" type="button" aria-label={open ? 'Fechar menu' : 'Abrir menu'} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        {open ? <X size={22} /> : <Menu size={22} />}
+      </button>
+      {open && <button className="sidebar-backdrop" type="button" aria-label="Fechar menu" onClick={() => setOpen(false)} />}
+      <aside className={`sidebar ${open ? 'sidebar-open' : ''}`} role="navigation" aria-label="Navegação principal">
       <div className="brand">
         <div className="brand-mark" aria-label="Logo Mertilo">
           M
@@ -76,6 +89,7 @@ export function Sidebar() {
               className={`nav-item ${isActive ? 'active' : ''}`}
               aria-label={item.ariaLabel}
               aria-current={isActive ? 'page' : undefined}
+              onClick={() => setOpen(false)}
             >
               <span className="nav-icon" aria-hidden="true">
                 <item.Icon size={20} strokeWidth={2} />
@@ -86,11 +100,12 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mini-card" role="region" aria-label="Meta mensal">
-        <span>Meta do mês</span>
-        <strong>R$ 10.000,00</strong>
-        <small>Guardar para investimentos</small>
+      <div className="mini-card" role="region" aria-label="Saldo em conta">
+        <span>Saldo em conta</span>
+        <strong>{formatCurrency(saldoTotal)}</strong>
+        <small>Dados atualizados pelo Dashboard</small>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

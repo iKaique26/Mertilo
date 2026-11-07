@@ -73,18 +73,6 @@ export default `
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
-  -- Add user_id to existing tables (non-destructive)
-  ALTER TABLE accounts ADD COLUMN user_id TEXT;
-  ALTER TABLE categories ADD COLUMN user_id TEXT;
-  ALTER TABLE monthly_history ADD COLUMN user_id TEXT;
-  ALTER TABLE salary_config ADD COLUMN user_id TEXT;
-  ALTER TABLE vehicle_expenses ADD COLUMN user_id TEXT;
-  ALTER TABLE irpf_exercises ADD COLUMN user_id TEXT;
-  ALTER TABLE irpf_documents ADD COLUMN user_id TEXT;
-  ALTER TABLE irpf_income ADD COLUMN user_id TEXT;
-  ALTER TABLE irpf_assets ADD COLUMN user_id TEXT;
-  ALTER TABLE irpf_dependents ADD COLUMN user_id TEXT;
-  ALTER TABLE irpf_deductions ADD COLUMN user_id TEXT;
-  ALTER TABLE irpf_validations ADD COLUMN user_id TEXT;
-  ALTER TABLE irpf_correction_history ADD COLUMN user_id TEXT;
+  -- Existing-table ownership columns are added idempotently by migrations.ts.
+  -- Legacy rows remain NULL and are never assigned automatically.
 `;

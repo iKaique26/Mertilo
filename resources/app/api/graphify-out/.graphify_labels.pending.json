@@ -1,0 +1,22 @@
+{
+  "0": "irpf.controller.ts",
+  "1": "file-processor.ts",
+  "2": "db.ts",
+  "3": "ownership.isolation.test.ts",
+  "4": "csv-import.service.ts",
+  "5": "email.service.ts",
+  "6": "migrations.ts",
+  "7": "package.json",
+  "8": "ref_fs",
+  "9": "document-reader.ts",
+  "10": "dependencies",
+  "11": "compilerOptions",
+  "12": "schemas/validation.ts",
+  "13": "AssistantService",
+  "14": "auth.service.ts",
+  "15": "scripts",
+  "16": "*",
+  "17": "yamljs.d.ts",
+  "18": ".eslintrc.js",
+  "19": "migrations_010_users_meta_investments.ts"
+}

@@ -11,6 +11,7 @@ export const categoryService = {
    * Retorna todas as categorias
    */
   async getAll(userId?: string): Promise<Category[]> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return categoryRepository.getAll(userId);
   },
 
@@ -18,6 +19,7 @@ export const categoryService = {
    * Retorna uma categoria pelo ID
    */
   async getById(id: string, userId?: string): Promise<Category | undefined> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return categoryRepository.getById(id, userId);
   },
 
@@ -30,6 +32,7 @@ export const categoryService = {
     percentual: number,
     userId?: string
   ): Promise<Category> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     // Validações de negócio
     if (!nome || nome.trim() === '') {
       throw new Error('Nome da categoria é obrigatório');
@@ -58,6 +61,7 @@ export const categoryService = {
     updates: Partial<Omit<Category, 'id'>>,
     userId?: string
   ): Promise<Category | null> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     // Validações de negócio
     if (updates.nome !== undefined && (!updates.nome || updates.nome.trim() === '')) {
       throw new Error('Nome inválido');
@@ -76,6 +80,7 @@ export const categoryService = {
    * Deleta uma categoria
    */
   async delete(id: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     return categoryRepository.delete(id, userId);
   },
 };

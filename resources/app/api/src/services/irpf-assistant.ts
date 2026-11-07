@@ -57,7 +57,7 @@ export class AssistantService {
       const exercise = exerciseStmt.get(...(userId ? [exerciseId, userId] : [exerciseId])) as any;
 
       if (!exercise) {
-        throw new Error(`Exercício ${exerciseId} não encontrado`);
+        return this.emptyAnalysis(exerciseId);
       }
 
       const issues: AssistantIssue[] = [];
@@ -69,14 +69,14 @@ export class AssistantService {
       const positiveChecks: AssistantCheckitem[] = [];
 
       // 1. ANALYZE DOCUMENTS
-      const docAnalysis = this.analyzeDocuments(exerciseId);
+      const docAnalysis = this.analyzeDocuments(exerciseId, userId);
       issues.push(...docAnalysis.issues);
       warnings.push(...docAnalysis.warnings);
       documentsToReview.push(...docAnalysis.documentsToReview);
       positiveChecks.push(...docAnalysis.positiveChecks);
 
       // 2. ANALYZE HOLERITES AND INCOME
-      const holeriteAnalysis = this.analyzeHolerites(exerciseId);
+      const holeriteAnalysis = this.analyzeHolerites(exerciseId, userId);
       issues.push(...holeriteAnalysis.issues);
       warnings.push(...holeriteAnalysis.warnings);
       inconsistencies.push(...holeriteAnalysis.inconsistencies);
@@ -85,30 +85,30 @@ export class AssistantService {
       positiveChecks.push(...holeriteAnalysis.positiveChecks);
 
       // 3. ANALYZE DEDUCTIONS
-      const deductionAnalysis = this.analyzeDeductions(exerciseId);
+      const deductionAnalysis = this.analyzeDeductions(exerciseId, userId);
       issues.push(...deductionAnalysis.issues);
       warnings.push(...deductionAnalysis.warnings);
       missingItems.push(...deductionAnalysis.missingItems);
       positiveChecks.push(...deductionAnalysis.positiveChecks);
 
       // 4. ANALYZE ASSETS
-      const assetAnalysis = this.analyzeAssets(exerciseId);
+      const assetAnalysis = this.analyzeAssets(exerciseId, userId);
       issues.push(...assetAnalysis.issues);
       warnings.push(...assetAnalysis.warnings);
       missingItems.push(...assetAnalysis.missingItems);
 
       // 5. ANALYZE DEPENDENTS
-      const dependentAnalysis = this.analyzeDependents(exerciseId);
+      const dependentAnalysis = this.analyzeDependents(exerciseId, userId);
       issues.push(...dependentAnalysis.issues);
       warnings.push(...dependentAnalysis.warnings);
 
       // 6. ANALYZE CONSISTENCY
-      const consistencyAnalysis = this.analyzeConsistency(exerciseId);
+      const consistencyAnalysis = this.analyzeConsistency(exerciseId, userId);
       inconsistencies.push(...consistencyAnalysis.issues);
       suggestedActions.push(...consistencyAnalysis.suggestedActions);
 
       // 7. GET SUMMARY STATS
-      const summary = this.getSummaryStats(exerciseId);
+      const summary = this.getSummaryStats(exerciseId, userId);
 
       // Calculate overall status and completion percentage
       const { overallStatus, completionPercentage } = this.calculateOverallStatus(
@@ -139,8 +139,27 @@ export class AssistantService {
     }
   }
 
+  private emptyAnalysis(exerciseId: string): AssistantAnalysis {
+    return {
+      exerciseId,
+      year: 0,
+      analyzedAt: new Date().toISOString(),
+      overallStatus: 'needs_attention',
+      completionPercentage: 0,
+      criticalIssues: [],
+      warnings: [],
+      missingItems: [],
+      inconsistencies: [],
+      documentsToReview: [],
+      suggestedActions: [],
+      positiveChecks: [],
+      summary: { documentsAnalyzed: 0, incomeRecords: 0, deductionRecords: 0, assetRecords: 0, dependentRecords: 0, holeriteCount: 0, incomeStatementsCount: 0 },
+    };
+  }
+
   private analyzeDocuments(
-    exerciseId: string
+    exerciseId: string,
+    userId?: string
   ): {
     issues: AssistantIssue[];
     warnings: AssistantIssue[];
@@ -154,9 +173,9 @@ export class AssistantService {
 
     // Get all documents
     const docsStmt = this.db.prepare(
-      'SELECT * FROM irpf_documents WHERE exercise_id = ? ORDER BY created_at DESC'
+      'SELECT d.* FROM irpf_documents d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?) ORDER BY d.created_at DESC'
     );
-    const documents = docsStmt.all(exerciseId) as any[];
+    const documents = docsStmt.all(exerciseId, userId ?? null, userId ?? null) as any[];
 
     if (documents.length === 0) {
       issues.push({
@@ -237,7 +256,8 @@ export class AssistantService {
   }
 
   private analyzeHolerites(
-    exerciseId: string
+    exerciseId: string,
+    userId?: string
   ): {
     issues: AssistantIssue[];
     warnings: AssistantIssue[];
@@ -255,9 +275,9 @@ export class AssistantService {
 
     // Get all holerites (documents of type 'holerite')
     const holeriteStmt = this.db.prepare(
-      "SELECT * FROM irpf_documents WHERE exercise_id = ? AND document_type = 'holerite' ORDER BY created_at DESC"
+      "SELECT d.* FROM irpf_documents d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?) AND d.document_type = 'holerite' ORDER BY d.created_at DESC"
     );
-    const holerites = holeriteStmt.all(exerciseId) as any[];
+    const holerites = holeriteStmt.all(exerciseId, userId ?? null, userId ?? null) as any[];
 
     if (holerites.length === 0) {
       missingItems.push({
@@ -387,7 +407,8 @@ export class AssistantService {
   }
 
   private analyzeDeductions(
-    exerciseId: string
+    exerciseId: string,
+    userId?: string
   ): {
     issues: AssistantIssue[];
     warnings: AssistantIssue[];
@@ -400,9 +421,9 @@ export class AssistantService {
     const positiveChecks: AssistantCheckitem[] = [];
 
     const deductionsStmt = this.db.prepare(
-      'SELECT * FROM irpf_deductions WHERE exercise_id = ? ORDER BY created_at DESC'
+      'SELECT d.* FROM irpf_deductions d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?) ORDER BY d.created_at DESC'
     );
-    const deductions = deductionsStmt.all(exerciseId) as any[];
+    const deductions = deductionsStmt.all(exerciseId, userId ?? null, userId ?? null) as any[];
 
     if (deductions.length > 0) {
       positiveChecks.push({
@@ -433,7 +454,8 @@ export class AssistantService {
   }
 
   private analyzeAssets(
-    exerciseId: string
+    exerciseId: string,
+    userId?: string
   ): {
     issues: AssistantIssue[];
     warnings: AssistantIssue[];
@@ -444,9 +466,9 @@ export class AssistantService {
     const missingItems: AssistantIssue[] = [];
 
     const assetsStmt = this.db.prepare(
-      'SELECT * FROM irpf_assets WHERE exercise_id = ? ORDER BY created_at DESC'
+      'SELECT a.* FROM irpf_assets a JOIN irpf_exercises e ON a.exercise_id = e.id WHERE a.exercise_id = ? AND (? IS NULL OR e.user_id = ?) ORDER BY a.created_at DESC'
     );
-    const assets = assetsStmt.all(exerciseId) as any[];
+    const assets = assetsStmt.all(exerciseId, userId ?? null, userId ?? null) as any[];
 
     if (assets.length > 0) {
       // Check for assets missing values or dates
@@ -467,7 +489,8 @@ export class AssistantService {
   }
 
   private analyzeDependents(
-    exerciseId: string
+    exerciseId: string,
+    userId?: string
   ): {
     issues: AssistantIssue[];
     warnings: AssistantIssue[];
@@ -476,9 +499,9 @@ export class AssistantService {
     const warnings: AssistantIssue[] = [];
 
     const dependentsStmt = this.db.prepare(
-      'SELECT * FROM irpf_dependents WHERE exercise_id = ? ORDER BY created_at DESC'
+      'SELECT d.* FROM irpf_dependents d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?) ORDER BY d.created_at DESC'
     );
-    const dependents = dependentsStmt.all(exerciseId) as any[];
+    const dependents = dependentsStmt.all(exerciseId, userId ?? null, userId ?? null) as any[];
 
     if (dependents.length > 0) {
       // Check for incomplete dependents
@@ -499,7 +522,8 @@ export class AssistantService {
   }
 
   private analyzeConsistency(
-    exerciseId: string
+    exerciseId: string,
+    userId?: string
   ): {
     issues: AssistantIssue[];
     suggestedActions: AssistantIssue[];
@@ -509,14 +533,14 @@ export class AssistantService {
 
     // Check for income statement vs holerites comparison
     const incomeStmtStmt = this.db.prepare(
-      "SELECT * FROM irpf_documents WHERE exercise_id = ? AND document_type = 'income_statement'"
+      "SELECT d.* FROM irpf_documents d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?) AND d.document_type = 'income_statement'"
     );
-    const incomeStatements = incomeStmtStmt.all(exerciseId) as any[];
+    const incomeStatements = incomeStmtStmt.all(exerciseId, userId ?? null, userId ?? null) as any[];
 
     const holeriteStmt = this.db.prepare(
-      "SELECT * FROM irpf_documents WHERE exercise_id = ? AND document_type = 'holerite'"
+      "SELECT d.* FROM irpf_documents d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?) AND d.document_type = 'holerite'"
     );
-    const holerites = holeriteStmt.all(exerciseId) as any[];
+    const holerites = holeriteStmt.all(exerciseId, userId ?? null, userId ?? null) as any[];
 
     if (incomeStatements.length > 0 && holerites.length > 0) {
       suggestedActions.push({
@@ -559,37 +583,38 @@ export class AssistantService {
     return duplicates;
   }
 
-  private getSummaryStats(exerciseId: string) {
+  private getSummaryStats(exerciseId: string, userId?: string) {
     const docsStmt = this.db.prepare(
-      'SELECT COUNT(*) as count FROM irpf_documents WHERE exercise_id = ?'
+      'SELECT COUNT(*) as count FROM irpf_documents d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?)'
     );
     const incomeStmt = this.db.prepare(
-      'SELECT COUNT(*) as count FROM irpf_income WHERE exercise_id = ?'
+      'SELECT COUNT(*) as count FROM irpf_income i JOIN irpf_exercises e ON i.exercise_id = e.id WHERE i.exercise_id = ? AND (? IS NULL OR e.user_id = ?)'
     );
     const deductionStmt = this.db.prepare(
-      'SELECT COUNT(*) as count FROM irpf_deductions WHERE exercise_id = ?'
+      'SELECT COUNT(*) as count FROM irpf_deductions d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?)'
     );
     const assetStmt = this.db.prepare(
-      'SELECT COUNT(*) as count FROM irpf_assets WHERE exercise_id = ?'
+      'SELECT COUNT(*) as count FROM irpf_assets a JOIN irpf_exercises e ON a.exercise_id = e.id WHERE a.exercise_id = ? AND (? IS NULL OR e.user_id = ?)'
     );
     const dependentStmt = this.db.prepare(
-      'SELECT COUNT(*) as count FROM irpf_dependents WHERE exercise_id = ?'
+      'SELECT COUNT(*) as count FROM irpf_dependents d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?)'
     );
     const holeriteStmt = this.db.prepare(
-      "SELECT COUNT(*) as count FROM irpf_documents WHERE exercise_id = ? AND document_type = 'holerite'"
+      "SELECT COUNT(*) as count FROM irpf_documents d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?) AND d.document_type = 'holerite'"
     );
     const incomeStmtCountStmt = this.db.prepare(
-      "SELECT COUNT(*) as count FROM irpf_documents WHERE exercise_id = ? AND document_type = 'income_statement'"
+      "SELECT COUNT(*) as count FROM irpf_documents d JOIN irpf_exercises e ON d.exercise_id = e.id WHERE d.exercise_id = ? AND (? IS NULL OR e.user_id = ?) AND d.document_type = 'income_statement'"
     );
+    const params = [exerciseId, userId ?? null, userId ?? null];
 
     return {
-      documentsAnalyzed: (docsStmt.get(exerciseId) as any).count || 0,
-      incomeRecords: (incomeStmt.get(exerciseId) as any).count || 0,
-      deductionRecords: (deductionStmt.get(exerciseId) as any).count || 0,
-      assetRecords: (assetStmt.get(exerciseId) as any).count || 0,
-      dependentRecords: (dependentStmt.get(exerciseId) as any).count || 0,
-      holeriteCount: (holeriteStmt.get(exerciseId) as any).count || 0,
-      incomeStatementsCount: (incomeStmtCountStmt.get(exerciseId) as any).count || 0,
+      documentsAnalyzed: (docsStmt.get(...params) as any).count || 0,
+      incomeRecords: (incomeStmt.get(...params) as any).count || 0,
+      deductionRecords: (deductionStmt.get(...params) as any).count || 0,
+      assetRecords: (assetStmt.get(...params) as any).count || 0,
+      dependentRecords: (dependentStmt.get(...params) as any).count || 0,
+      holeriteCount: (holeriteStmt.get(...params) as any).count || 0,
+      incomeStatementsCount: (incomeStmtCountStmt.get(...params) as any).count || 0,
     };
   }
 

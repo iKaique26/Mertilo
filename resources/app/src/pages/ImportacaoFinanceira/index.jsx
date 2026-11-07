@@ -27,6 +27,7 @@ export function ImportacaoFinanceira() {
   const [lastCsvText, setLastCsvText] = useState('');
   const [undoingImportId, setUndoingImportId] = useState(null);
   const [removingTransactionId, setRemovingTransactionId] = useState(null);
+  const categories = state.categories || [];
 
   async function refreshPreview(nextMapping = mapping) {
     if (!lastCsvText) return;
@@ -152,7 +153,7 @@ export function ImportacaoFinanceira() {
             </p>
           </div>
           <input ref={fileInputRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const file = e.target.files?.[0]; if (file) readAndPreviewFile(file); }} />
-          <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>Selecionar arquivo</button>
+          <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()} disabled={loading || uploading}>{loading ? 'Analisando...' : 'Selecionar arquivo'}</button>
         </div>
       </div>
 
@@ -276,7 +277,7 @@ export function ImportacaoFinanceira() {
         <section className="panel">
           <div className="panel-header">
             <h3>Prévia das movimentações</h3>
-            <button className="btn btn-primary" onClick={handleConfirm} disabled={uploading}>{uploading ? 'Importando...' : 'Confirmar importação'}</button>
+            <button className="btn btn-primary" onClick={handleConfirm} disabled={loading || uploading}>{uploading ? 'Importando...' : 'Confirmar importação'}</button>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -298,7 +299,13 @@ export function ImportacaoFinanceira() {
                     <td style={{ padding: '0.75rem 0.5rem', color: item.value >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
                       {formatCurrency(item.value)}
                     </td>
-                    <td style={{ padding: '0.75rem 0.5rem' }}>{item.category} / {item.subcategory}</td>
+                    <td style={{ padding: '0.75rem 0.5rem' }}>
+                      <select className="input" value={item.category || ''} onChange={(event) => setPreview((current) => ({ ...current, records: current.records.map((record) => record.id === item.id ? { ...record, category: event.target.value } : record) }))} disabled={loading || uploading}>
+                        <option value="">Sem categoria</option>
+                        {categories.map((category) => <option key={typeof category === 'string' ? category : category.name} value={typeof category === 'string' ? category : category.name}>{typeof category === 'string' ? category : category.name}</option>)}
+                      </select>
+                      <small>{item.subcategory}</small>
+                    </td>
                     <td style={{ padding: '0.75rem 0.5rem' }}>
                       {item.potentialDuplicate ? <span style={{ color: '#f59e0b' }}>Duplicata</span> : item.manualReview ? <span style={{ color: '#f59e0b' }}>Revisão</span> : <span style={{ color: 'var(--color-success)' }}>Pronto</span>}
                     </td>

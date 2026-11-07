@@ -189,9 +189,16 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: none;
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
   box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.28);
   border-color: rgba(139, 92, 246, 0.7);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1;
 }
 
 @keyframes cardEntrance {
@@ -1078,6 +1085,7 @@ textarea:focus-visible {
 
 .modal-overlay {
   position: fixed;
+  animation: fadeIn 0.2s ease-in-out;
   top: 0;
   left: 0;
   right: 0;
@@ -1183,6 +1191,16 @@ textarea:focus-visible {
   background: rgba(251, 191, 36, 0.12);
   color: #fde047;
   border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slideIn {
@@ -1300,6 +1318,12 @@ textarea:focus-visible {
     max-height: none;
   }
 
+  .document-list,
+  .table-container {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1307,6 +1331,53 @@ textarea:focus-visible {
   .content-grid {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 767px) {
+  .app-shell {
+    display: block;
+    padding: var(--spacing-lg);
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 12px auto 12px 12px;
+    width: min(280px, calc(100vw - 24px));
+    z-index: 50;
+    transform: translateX(-115%);
+    transition: transform 0.2s ease-in-out;
+  }
+
+  .sidebar.sidebar-open { transform: translateX(0); }
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    border: 0;
+    background: rgba(0, 0, 0, 0.65);
+  }
+
+  .mobile-menu-toggle {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
+  }
+
+  .topbar { padding-left: 60px; }
+}
+
+@media (min-width: 768px) {
+  .mobile-menu-toggle,
+  .sidebar-backdrop { display: none; }
 }
 
 @media (max-width: 620px) {

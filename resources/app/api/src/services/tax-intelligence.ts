@@ -30,12 +30,19 @@ export const taxIntelligenceService = {
       if (!exercise) return;
 
       // Limpar alertas antigos
-      db.prepare('DELETE FROM irpf_alerts WHERE exercise_id = ?').run(exerciseId);
+      if (userId) {
+        db.prepare('DELETE FROM irpf_alerts WHERE exercise_id = ? AND exercise_id IN (SELECT id FROM irpf_exercises WHERE user_id = ?)').run(exerciseId, userId);
+      } else {
+        db.prepare('DELETE FROM irpf_alerts WHERE exercise_id = ?').run(exerciseId);
+      }
+
+      const exerciseFilter = userId ? ' AND exercise_id IN (SELECT id FROM irpf_exercises WHERE user_id = ?)' : '';
+      const exerciseParams = userId ? [exerciseId, userId] : [exerciseId];
 
       // Verificar documentos sem revisão
       const unreviedDocs = db
-        .prepare('SELECT COUNT(*) as count FROM irpf_documents WHERE exercise_id = ? AND is_verified = 0')
-        .get(exerciseId) as any;
+        .prepare(`SELECT COUNT(*) as count FROM irpf_documents WHERE exercise_id = ? AND is_verified = 0${exerciseFilter}`)
+        .get(...exerciseParams) as any;
 
       if (unreviedDocs.count > 0) {
         this.createAlert(
@@ -48,8 +55,8 @@ export const taxIntelligenceService = {
 
       // Verificar rendimentos sem verificação
       const unverifiedIncome = db
-        .prepare('SELECT COUNT(*) as count FROM irpf_income WHERE exercise_id = ? AND is_verified = 0')
-        .get(exerciseId) as any;
+        .prepare(`SELECT COUNT(*) as count FROM irpf_income WHERE exercise_id = ? AND is_verified = 0${exerciseFilter}`)
+        .get(...exerciseParams) as any;
 
       if (unverifiedIncome.count > 0) {
         this.createAlert(
@@ -63,9 +70,9 @@ export const taxIntelligenceService = {
       // Verificar documentos com confiança baixa
       const lowConfidenceDocs = db
         .prepare(
-          'SELECT COUNT(*) as count FROM irpf_documents WHERE exercise_id = ? AND confidence_score < 70'
+          `SELECT COUNT(*) as count FROM irpf_documents WHERE exercise_id = ? AND confidence_score < 70${exerciseFilter}`
         )
-        .get(exerciseId) as any;
+        .get(...exerciseParams) as any;
 
       if (lowConfidenceDocs.count > 0) {
         this.createAlert(
@@ -81,12 +88,11 @@ export const taxIntelligenceService = {
         .prepare(`
           SELECT filename, COUNT(*) as count 
           FROM irpf_documents 
-          WHERE exercise_id = ? 
-          GROUP BY filename 
-          HAVING count > 1
+           WHERE exercise_id = ?${exerciseFilter}
+           GROUP BY filename 
+           HAVING count > 1
         `)
-        .all(exerciseId) as any[];
-
+        .all(...exerciseParams) as any[];
       for (const dup of duplicateDocs) {
         this.createAlert(
           exerciseId,
@@ -100,9 +106,9 @@ export const taxIntelligenceService = {
       const incomeWithoutDoc = db
         .prepare(
           `SELECT COUNT(*) as count FROM irpf_income 
-           WHERE exercise_id = ? AND document_id IS NULL AND confidence_score < 100`
+           WHERE exercise_id = ? AND document_id IS NULL AND confidence_score < 100${exerciseFilter}`
         )
-        .get(exerciseId) as any;
+        .get(...exerciseParams) as any;
 
       if (incomeWithoutDoc.count > 0) {
         this.createAlert(
@@ -115,8 +121,8 @@ export const taxIntelligenceService = {
 
       // Verificar dependentes sem CPF
       const dependentsNoCPF = db
-        .prepare('SELECT COUNT(*) as count FROM irpf_dependents WHERE exercise_id = ? AND cpf IS NULL')
-        .get(exerciseId) as any;
+        .prepare(`SELECT COUNT(*) as count FROM irpf_dependents WHERE exercise_id = ? AND cpf IS NULL${exerciseFilter}`)
+        .get(...exerciseParams) as any;
 
       if (dependentsNoCPF.count > 0) {
         this.createAlert(
@@ -130,9 +136,9 @@ export const taxIntelligenceService = {
       // Verificar bens sem descrição
       const assetsNoDescription = db
         .prepare(
-          'SELECT COUNT(*) as count FROM irpf_assets WHERE exercise_id = ? AND (description IS NULL OR description = "")'
+          `SELECT COUNT(*) as count FROM irpf_assets WHERE exercise_id = ? AND (description IS NULL OR description = "")${exerciseFilter}`
         )
-        .get(exerciseId) as any;
+        .get(...exerciseParams) as any;
 
       if (assetsNoDescription.count > 0) {
         this.createAlert(
@@ -148,9 +154,9 @@ export const taxIntelligenceService = {
         .prepare(
           `SELECT COUNT(DISTINCT CAST(json_extract(extracted_data, '$.competencia') as TEXT)) as months 
            FROM irpf_documents 
-           WHERE exercise_id = ? AND document_type = 'holerite'`
+           WHERE exercise_id = ? AND document_type = 'holerite'${exerciseFilter}`
         )
-        .get(exerciseId) as any;
+        .get(...exerciseParams) as any;
 
       if (incomeDocs.months > 0 && incomeDocs.months < 12) {
         this.createAlert(
@@ -166,11 +172,11 @@ export const taxIntelligenceService = {
         .prepare(
           `SELECT COUNT(*) as count 
            FROM irpf_income 
-           WHERE exercise_id = ? AND amount > (
-             SELECT COALESCE(SUM(amount), 0) * 1.5 FROM irpf_income WHERE exercise_id = ?
-           )`
-        )
-        .all(exerciseId, exerciseId) as any;
+           WHERE exercise_id = ?${exerciseFilter} AND amount > (
+             SELECT COALESCE(SUM(amount), 0) * 1.5 FROM irpf_income WHERE exercise_id = ?${exerciseFilter}
+           )
+        `)
+        .all(...(userId ? [exerciseId, userId, exerciseId, userId] : [exerciseId, exerciseId])) as any;
 
       if (inconsistentData[0]?.count > 0) {
         this.createAlert(
@@ -243,10 +249,11 @@ export const taxIntelligenceService = {
   /**
    * Resolver alerta
    */
-  resolveAlert(alertId: string): void {
+  resolveAlert(alertId: string, userId?: string): boolean {
     const db = getDatabase();
-    db.prepare('UPDATE irpf_alerts SET is_resolved = 1, updated_at = datetime("now") WHERE id = ?').run(
-      alertId
-    );
+    const result = userId
+      ? db.prepare('UPDATE irpf_alerts SET is_resolved = 1, updated_at = datetime("now") WHERE id = ? AND exercise_id IN (SELECT id FROM irpf_exercises WHERE user_id = ?)').run(alertId, userId)
+      : db.prepare('UPDATE irpf_alerts SET is_resolved = 1, updated_at = datetime("now") WHERE id = ?').run(alertId);
+    return result.changes > 0;
   },
 };

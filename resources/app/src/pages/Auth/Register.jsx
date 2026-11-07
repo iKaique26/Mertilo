@@ -16,19 +16,29 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError(null);
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!name.trim() || !normalizedEmail || !password || !confirm) {
+      setError('Preencha todos os campos obrigatórios.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setError('Informe um e-mail válido.');
+      return;
+    }
     if (password !== confirm) {
-      setError('As senhas não coincidem');
+      setError('As senhas não coincidem.');
       return;
     }
     if (password.length < 8) {
-      setError('A senha deve ter ao menos 8 caracteres');
+      setError('A senha deve ter ao menos 8 caracteres.');
       return;
     }
     setLoading(true);
     try {
-      await register(name, email, password);
-      sessionStorage.setItem('mertilo_verification_email', email.trim().toLowerCase());
+      await register(name.trim(), normalizedEmail, password);
+      sessionStorage.setItem('mertilo_verification_email', normalizedEmail);
       setSuccess(true);
     } catch (err) {
       setError(err.message || 'Erro ao registrar');
@@ -70,34 +80,34 @@ export default function Register() {
           <p className="form-subtitle">Crie sua conta Mertilo</p>
           <form onSubmit={handleSubmit} aria-label="register-form">
             <div className="field input-wrapper">
-              <label className="input-label">Nome</label>
+              <label className="input-label" htmlFor="register-name">Nome</label>
               <div className="input-container">
                 <span className="input-icon"><User size={16} /></span>
-                <input className="input with-icon" value={name} onChange={(e) => setName(e.target.value)} required />
+                <input id="register-name" className="input with-icon" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />
               </div>
             </div>
 
             <div className="field input-wrapper">
-              <label className="input-label">E-mail</label>
+              <label className="input-label" htmlFor="register-email">E-mail</label>
               <div className="input-container">
                 <span className="input-icon"><Mail size={16} /></span>
-                <input className="input with-icon" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
+                <input id="register-email" className="input with-icon" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" />
               </div>
             </div>
 
             <div className="field input-wrapper">
-              <label className="input-label">Senha</label>
+              <label className="input-label" htmlFor="register-password">Senha</label>
               <div className="input-container">
                 <span className="input-icon"><Lock size={16} /></span>
-                <input className="input with-icon" value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
+                <input id="register-password" className="input with-icon" value={password} onChange={(e) => setPassword(e.target.value)} type="password" required autoComplete="new-password" />
               </div>
             </div>
 
             <div className="field input-wrapper">
-              <label className="input-label">Confirmar senha</label>
+              <label className="input-label" htmlFor="register-confirm-password">Confirmar senha</label>
               <div className="input-container">
                 <span className="input-icon"><Lock size={16} /></span>
-                <input className="input with-icon" value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" required />
+                <input id="register-confirm-password" className="input with-icon" value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" required autoComplete="new-password" />
               </div>
             </div>
 

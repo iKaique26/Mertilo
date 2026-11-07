@@ -33,7 +33,7 @@ export const irpfService = {
   async createExercise(year: number, userId?: string): Promise<IRPFExercise> {
     try {
       // Verificar se exercício já existe
-      const existing = exercisesRepository.getByYear(year);
+      const existing = exercisesRepository.getByYear(year, userId);
       if (existing) {
         throw new Error(`Exercício ${year} já existe`);
       }
@@ -142,6 +142,9 @@ export const irpfService = {
           .run(exerciseId, id, id, `${id},%`, `%,${id}`);
       });
 
+      const deleted = documentsRepository.delete(id, userId);
+      if (!deleted) return false;
+
       try {
         if (doc.file_path && fs.existsSync(doc.file_path)) {
           fs.unlinkSync(doc.file_path);
@@ -150,7 +153,7 @@ export const irpfService = {
         logger.warn('Arquivo de documento não pôde ser removido durante exclusão segura:', fileError);
       }
 
-      return documentsRepository.delete(id, userId);
+      return true;
     } catch (error) {
       logger.error('Erro ao deletar documento:', error);
       throw error;

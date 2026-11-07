@@ -11,9 +11,9 @@ export const salaryController = {
   /**
    * GET /api/financas/salario
    */
-  async get(_req: Request, res: Response) {
+  async get(req: Request, res: Response) {
     try {
-      const salary = await salaryService.get();
+      const salary = await salaryService.get((req as any).user?.id);
       res.json({ salario: salary });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao buscar salário';
@@ -30,7 +30,7 @@ export const salaryController = {
       if (typeof salario !== 'number') {
         return badRequest(res, 'Salário deve ser um número');
       }
-      const updated = await salaryService.set(salario);
+      const updated = await salaryService.set(salario, (req as any).user?.id);
       res.json({ salario: updated });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao atualizar salário';

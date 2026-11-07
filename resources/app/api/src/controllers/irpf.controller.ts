@@ -17,65 +17,17 @@ import { AssistantService } from '../services/irpf-assistant.js';
 import { IRPFValidationService } from '../services/irpf-validation.js';
 import { correctionsRepository } from '../repositories/irpf.repository.js';
 import { validationsRepository } from '../repositories/irpf.repository.js';
+import { createExercise, getExercises, getExerciseById, updateExercise } from '../modules/irpf/controllers/exercise.controller.js';
+import { createIncome, getIncomes, getIncomeById, updateIncome, deleteIncome } from '../modules/irpf/controllers/income.controller.js';
+import { createAsset, getAssets, getAssetById, updateAsset, deleteAsset } from '../modules/irpf/controllers/asset.controller.js';
+import { createDeduction, getDeductions, getDeductionById, updateDeduction, deleteDeduction } from '../modules/irpf/controllers/deduction.controller.js';
 
 export const irpfController = {
   // ===== EXERCISES =====
-
-  async createExercise(req: Request, res: Response) {
-    try {
-      const { year } = req.body;
-      if (!year || typeof year !== 'number') {
-        return badRequest(res, 'year é obrigatório e deve ser um número');
-      }
-
-      const userId = (req as any).user?.id;
-      const exercise = await irpfService.createExercise(year, userId);
-      res.status(201).json(exercise);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao criar exercício';
-      return badRequest(res, message);
-    }
-  },
-
-  async getExercises(_req: Request, res: Response) {
-    try {
-      const userId = (_req as any).user?.id;
-      const exercises = await irpfService.getExercises(userId);
-      res.json(exercises);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao buscar exercícios';
-      return badRequest(res, message);
-    }
-  },
-
-  async getExerciseById(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      const exercise = await irpfService.getExerciseById(req.params.id, userId);
-      if (!exercise) {
-        return notFound(res, 'Exercício não encontrado');
-      }
-      res.json(exercise);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao buscar exercício';
-      return badRequest(res, message);
-    }
-  },
-
-  async updateExercise(req: Request, res: Response) {
-    try {
-      const { status, progress } = req.body;
-      const userId = (req as any).user?.id;
-      const exercise = await irpfService.updateExercise(req.params.id, { status, progress } as any, userId);
-      if (!exercise) {
-        return notFound(res, 'Exercício não encontrado');
-      }
-      res.json(exercise);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao atualizar exercício';
-      return badRequest(res, message);
-    }
-  },
+  createExercise,
+  getExercises,
+  getExerciseById,
+  updateExercise,
 
   // ===== DOCUMENTS =====
 
@@ -88,10 +40,12 @@ export const irpfController = {
       }
 
       const userId = (req as any).user?.id;
+      const exercise = await irpfService.getExerciseById(exercise_id, userId);
+      if (!exercise) return notFound(res, 'Exercício não encontrado');
       const document = await irpfService.createDocument(exercise_id, {
         exercise_id,
-        filename,
-        file_path,
+        filename: path.basename(filename),
+        file_path: path.resolve(file_path),
         file_type,
         mime_type,
         file_size,
@@ -177,6 +131,11 @@ export const irpfController = {
         return badRequest(res, 'Faltam campos obrigatórios');
       }
 
+      const userId = (req as any).user?.id;
+      if (!await irpfService.getExerciseById(exerciseId, userId)) {
+        return notFound(res, 'Exercício não encontrado');
+      }
+
       // Validar MIME type
       const ALLOWED_MIMES = ['application/pdf', 'image/png', 'image/jpeg', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
       if (!ALLOWED_MIMES.includes(mime_type)) {
@@ -201,71 +160,57 @@ export const irpfController = {
         return badRequest(res, 'Nome de arquivo inválido');
       }
 
-      // Criar diretório privado de documentos
-      const docDir = path.join(process.cwd(), 'api', 'data', 'documents', exerciseId);
-      if (!fs.existsSync(docDir)) {
-        fs.mkdirSync(docDir, { recursive: true });
-      }
-
-      // Gerar nome único
+      const documentsRoot = path.resolve(process.cwd(), 'api', 'data', 'documents');
+      const docDir = path.join(documentsRoot, exerciseId);
+      const tempDir = fs.mkdtempSync(path.join(documentsRoot, '.upload-'));
       const timestamp = Date.now();
-      const uniqueFilename = `${timestamp}_${filename}`;
+      const uniqueFilename = `${timestamp}_${path.basename(filename)}`;
+      const tempPath = path.join(tempDir, uniqueFilename);
       const filePath = path.join(docDir, uniqueFilename);
 
-      // Decodificar e salvar arquivo
-      const buffer = Buffer.from(file_content.split(',')[1] || file_content, 'base64');
-      fs.writeFileSync(filePath, buffer);
+      if (!path.resolve(tempPath).startsWith(path.resolve(documentsRoot) + path.sep)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        return badRequest(res, 'Caminho de arquivo inválido');
+      }
 
-      logger.info(`Arquivo salvo: ${filePath}`);
+      try {
+        const buffer = Buffer.from(file_content.split(',')[1] || file_content, 'base64');
+        if (buffer.length === 0 || (file_size && buffer.length !== file_size)) {
+          return badRequest(res, 'Conteúdo do arquivo inválido');
+        }
+        fs.writeFileSync(tempPath, buffer, { flag: 'wx' });
 
-      // Processar arquivo
-      const processResult = await processFile(filePath, mime_type);
+        const processResult = await processFile(tempPath, mime_type);
+        if (!processResult.success) {
+          return badRequest(res, processResult.errors[0] || 'Falha ao processar documento');
+        }
 
-      // Criar registro no banco (sem extracted_data inicialmente)
-      const userId = (req as any).user?.id;
-      const document = await irpfService.createDocument(exerciseId, {
+        fs.mkdirSync(docDir, { recursive: true });
+        fs.renameSync(tempPath, filePath);
+
+        // Upload mantém arquivo em área do exercício; persistência ocorre só após confirmação.
+      const draft = {
+        id: `draft_${timestamp}`,
         exercise_id: exerciseId,
-        filename: filename,
+        filename,
         file_path: filePath,
         file_type: ext.substring(1),
-        mime_type: mime_type,
-        file_size: file_size,
+        mime_type,
+        file_size,
         document_type: processResult.documentType,
         status: 'pending',
-        extraction_progress: 0,
-        confidence_score: 0,
-        is_verified: false,
-      }, userId);
-
-      // Atualizar com dados extraídos
-      const updated = await irpfService.updateDocument(document.id, {
-        extracted_data: JSON.stringify(processResult),
-        status: 'extracted',
         extraction_progress: 100,
         confidence_score: processResult.confidence || 0,
-      }, userId);
+        is_verified: false,
+      };
 
-      // Gerar alertas se necessário
-      if (processResult.errors && processResult.errors.length > 0) {
-        for (const error of processResult.errors) {
-          await taxIntelligenceService.createAlert(exerciseId, 'extraction_error', 'warning', error, updated?.id);
-        }
+      res.status(201).json({ document: draft, extraction: processResult });
+      } catch (error) {
+        if (fs.existsSync(filePath)) fs.rmSync(filePath, { force: true });
+        throw error;
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
       }
-
-      if ((processResult.confidence || 0) < 70) {
-        await taxIntelligenceService.createAlert(
-          exerciseId,
-          'low_confidence',
-          'info',
-          `Confiança: ${processResult.confidence}%`,
-          updated?.id
-        );
-      }
-
-      res.status(201).json({
-        document: updated || document,
-        extraction: processResult,
-      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao fazer upload';
       logger.error(`Upload error: ${message}`, error);
@@ -275,15 +220,21 @@ export const irpfController = {
 
   async confirmDocument(req: Request, res: Response) {
     const { id } = req.params;
-    const { extracted_data, corrections } = req.body;
+    const { extracted_data, corrections, draft_document } = req.body;
 
     try {
-      // Buscar documento
       const userId = (req as any).user?.id;
-      const document = await irpfService.getDocumentById(id, userId);
-      if (!document) {
-        return notFound(res, 'Documento não encontrado');
+      let document = await irpfService.getDocumentById(id, userId);
+      if (!document && draft_document?.id === id) {
+        const exercise = await irpfService.getExerciseById(draft_document.exercise_id, userId);
+        if (!exercise) return notFound(res, 'Exercício não encontrado');
+        document = await irpfService.createDocument(draft_document.exercise_id, {
+          ...draft_document,
+          status: 'pending',
+          is_verified: false,
+        }, userId);
       }
+      if (!document) return notFound(res, 'Documento não encontrado');
 
       // Aplicar correções se fornecidas
       let finalData = extracted_data || document.extracted_data;
@@ -393,176 +344,18 @@ export const irpfController = {
   },
 
   // ===== INCOME =====
-
-  async createIncome(req: Request, res: Response) {
-    try {
-      const { exercise_id, document_id, income_type, description, amount, month, source, confidence_score, is_verified } = req.body;
-
-      if (!exercise_id || !income_type || typeof amount !== 'number') {
-        return badRequest(res, 'Campos obrigatórios: exercise_id, income_type, amount');
-      }
-
-      const userId = (req as any).user?.id;
-      const income = await irpfService.createIncome(exercise_id, {
-        exercise_id,
-        document_id,
-        income_type,
-        description,
-        amount,
-        month,
-        source,
-        confidence_score: confidence_score || 100,
-        is_verified: is_verified || false,
-      }, userId);
-
-      res.status(201).json(income);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao criar rendimento';
-      return badRequest(res, message);
-    }
-  },
-
-  async getIncomes(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      const incomes = await irpfService.getIncomes(req.params.exercise_id, userId);
-      res.json(incomes);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao buscar rendimentos';
-      return badRequest(res, message);
-    }
-  },
-
-  async getIncomeById(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      const income = await irpfService.getIncomeById(req.params.id, userId);
-      if (!income) {
-        return notFound(res, 'Rendimento não encontrado');
-      }
-      res.json(income);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao buscar rendimento';
-      return badRequest(res, message);
-    }
-  },
-
-  async updateIncome(req: Request, res: Response) {
-    try {
-      const { amount, description, confidence_score, is_verified } = req.body;
-      const userId = (req as any).user?.id;
-      const income = await irpfService.updateIncome(req.params.id, {
-        amount,
-        description,
-        confidence_score,
-        is_verified,
-      } as any, userId);
-
-      if (!income) {
-        return notFound(res, 'Rendimento não encontrado');
-      }
-      res.json(income);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao atualizar rendimento';
-      return badRequest(res, message);
-    }
-  },
-
-  async deleteIncome(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      await irpfService.deleteIncome(req.params.id, userId);
-      res.status(204).send();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao deletar rendimento';
-      return badRequest(res, message);
-    }
-  },
+  createIncome,
+  getIncomes,
+  getIncomeById,
+  updateIncome,
+  deleteIncome,
 
   // ===== ASSETS =====
-
-  async createAsset(req: Request, res: Response) {
-    try {
-      const { exercise_id, document_id, asset_type, description, value, location, confidence_score, is_verified } = req.body;
-      if (!exercise_id || !asset_type || typeof value !== 'number') {
-        return badRequest(res, 'Campos obrigatórios: exercise_id, asset_type, value');
-      }
-
-      const userId = (req as any).user?.id;
-      const asset = await irpfService.createAsset(exercise_id, {
-        exercise_id,
-        document_id,
-        asset_type,
-        description,
-        value,
-        location,
-        confidence_score: confidence_score || 100,
-        is_verified: is_verified || false,
-      }, userId);
-
-      res.status(201).json(asset);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao criar bem';
-      return badRequest(res, message);
-    }
-  },
-
-  async getAssets(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      const assets = await irpfService.getAssets(req.params.exercise_id, userId);
-      res.json(assets);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao buscar bens';
-      return badRequest(res, message);
-    }
-  },
-
-  async getAssetById(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      const asset = await irpfService.getAssetById(req.params.id, userId);
-      if (!asset) {
-        return notFound(res, 'Bem não encontrado');
-      }
-      res.json(asset);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao buscar bem';
-      return badRequest(res, message);
-    }
-  },
-
-  async updateAsset(req: Request, res: Response) {
-    try {
-      const { value, description, confidence_score, is_verified } = req.body;
-      const userId = (req as any).user?.id;
-      const asset = await irpfService.updateAsset(req.params.id, {
-        value,
-        description,
-        confidence_score,
-        is_verified,
-      } as any, userId);
-
-      if (!asset) {
-        return notFound(res, 'Bem não encontrado');
-      }
-      res.json(asset);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao atualizar bem';
-      return badRequest(res, message);
-    }
-  },
-
-  async deleteAsset(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      await irpfService.deleteAsset(req.params.id, userId);
-      res.status(204).send();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao deletar bem';
-      return badRequest(res, message);
-    }
-  },
+  createAsset,
+  getAssets,
+  getAssetById,
+  updateAsset,
+  deleteAsset,
 
   // ===== DEPENDENTS =====
 
@@ -650,90 +443,11 @@ export const irpfController = {
   },
 
   // ===== DEDUCTIONS =====
-
-  async createDeduction(req: Request, res: Response) {
-    try {
-      const { exercise_id, document_id, deduction_type, description, amount, category, confidence_score, is_verified } = req.body;
-
-      if (!exercise_id || !deduction_type || typeof amount !== 'number') {
-        return badRequest(res, 'Campos obrigatórios: exercise_id, deduction_type, amount');
-      }
-
-      const userId = (req as any).user?.id;
-      const deduction = await irpfService.createDeduction(exercise_id, {
-        exercise_id,
-        document_id,
-        deduction_type,
-        description,
-        amount,
-        category,
-        confidence_score: confidence_score || 100,
-        is_verified: is_verified || false,
-      }, userId);
-
-      res.status(201).json(deduction);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao criar dedução';
-      return badRequest(res, message);
-    }
-  },
-
-  async getDeductions(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      const deductions = await irpfService.getDeductions(req.params.exercise_id, userId);
-      res.json(deductions);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao buscar deduções';
-      return badRequest(res, message);
-    }
-  },
-
-  async getDeductionById(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      const deduction = await irpfService.getDeductionById(req.params.id, userId);
-      if (!deduction) {
-        return notFound(res, 'Dedução não encontrada');
-      }
-      res.json(deduction);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao buscar dedução';
-      return badRequest(res, message);
-    }
-  },
-
-  async updateDeduction(req: Request, res: Response) {
-    try {
-      const { amount, description, confidence_score, is_verified } = req.body;
-      const userId = (req as any).user?.id;
-      const deduction = await irpfService.updateDeduction(req.params.id, {
-        amount,
-        description,
-        confidence_score,
-        is_verified,
-      } as any, userId);
-
-      if (!deduction) {
-        return notFound(res, 'Dedução não encontrada');
-      }
-      res.json(deduction);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao atualizar dedução';
-      return badRequest(res, message);
-    }
-  },
-
-  async deleteDeduction(req: Request, res: Response) {
-    try {
-      const userId = (req as any).user?.id;
-      await irpfService.deleteDeduction(req.params.id, userId);
-      res.status(204).send();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao deletar dedução';
-      return badRequest(res, message);
-    }
-  },
+  createDeduction,
+  getDeductions,
+  getDeductionById,
+  updateDeduction,
+  deleteDeduction,
 
   // ===== ALERTS =====
 
@@ -1007,7 +721,10 @@ export const irpfController = {
         return badRequest(res, 'alert_id é obrigatório');
       }
 
-      taxIntelligenceService.resolveAlert(alertId);
+      const userId = (req as any).user?.id;
+      if (!taxIntelligenceService.resolveAlert(alertId, userId)) {
+        return notFound(res, 'Alerta não encontrado');
+      }
 
       res.json({ success: true, alert_id: alertId });
     } catch (error) {
@@ -1370,7 +1087,8 @@ export const irpfController = {
     try {
       const documentId = req.params.documentId;
       if (!documentId) return badRequest(res, 'documentId é obrigatório');
-      const corrections = correctionsRepository.getByDocument(documentId);
+      const userId = (req as any).user?.id;
+      const corrections = correctionsRepository.getByDocument(documentId, userId);
       res.json(corrections);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao buscar correções';
@@ -1382,7 +1100,9 @@ export const irpfController = {
     try {
       const exerciseId = req.params.exerciseId;
       if (!exerciseId) return badRequest(res, 'exerciseId é obrigatório');
-      const corrections = correctionsRepository.getByExercise(exerciseId);
+      const userId = (req as any).user?.id;
+      if (!(await irpfService.getExerciseById(exerciseId, userId))) return notFound(res, 'Exercício não encontrado');
+      const corrections = correctionsRepository.getByExercise(exerciseId, userId);
       res.json(corrections);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao buscar correções por exercício';
@@ -1394,7 +1114,9 @@ export const irpfController = {
     try {
       const exerciseId = req.params.exercise_id;
       if (!exerciseId) return badRequest(res, 'exercise_id é obrigatório');
-      const validations = validationsRepository.getByExercise(exerciseId);
+      const userId = (req as any).user?.id;
+      if (!(await irpfService.getExerciseById(exerciseId, userId))) return notFound(res, 'Exercício não encontrado');
+      const validations = validationsRepository.getByExercise(exerciseId, userId);
       res.json(validations);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao buscar validações';
@@ -1406,8 +1128,11 @@ export const irpfController = {
     try {
       const validationId = req.params.validation_id;
       const { status } = req.body;
-      if (!validationId || !status) return badRequest(res, 'validation_id e status são obrigatórios');
-      const updated = validationsRepository.updateStatus(validationId, status);
+      const allowedStatuses = ['PENDING', 'REVIEWED', 'RESOLVED', 'IGNORED'];
+      if (!validationId || !allowedStatuses.includes(status)) return badRequest(res, 'validation_id e status válido são obrigatórios');
+      const userId = (req as any).user?.id;
+      const updated = validationsRepository.updateStatus(validationId, status, userId);
+      if (!updated) return notFound(res, 'Validação não encontrada');
       res.json(updated);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao atualizar validação';
@@ -1422,8 +1147,9 @@ export const irpfController = {
       // Re-execute validation engine (it upserts validations)
       const validationService = new IRPFValidationService();
       const userId = (req as any).user?.id;
+      if (!(await irpfService.getExerciseById(exerciseId, userId))) return notFound(res, 'Exercício não encontrado');
       const result = await validationService.validateExercise(exerciseId, userId);
-      const validations = validationsRepository.getByExercise(exerciseId);
+      const validations = validationsRepository.getByExercise(exerciseId, userId);
       res.json({ ran_at: new Date().toISOString(), summary: result.summary, validations });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao reexecutar validações';

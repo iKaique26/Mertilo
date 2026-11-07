@@ -74,11 +74,14 @@ export async function extractTextFromImage(imagePath: string): Promise<OCRResult
       const ocrResult = await worker.recognize(imageData);
       
       result.text = ocrResult.data.text || '';
-      result.confidence = Math.round((ocrResult.data.confidence || 0) / 100); // Convert to percentage
-      result.success = result.text.length > 0;
+      result.confidence = Math.max(0, Math.min(100, Math.round(ocrResult.data.confidence || 0)));
+      result.success = result.text.trim().length > 0;
 
       if (!result.success) {
         result.errors.push('OCR não conseguiu extrair texto da imagem');
+      }
+      if (result.confidence < 60) {
+        result.errors.push('OCR produziu texto com baixa confiança; revisão manual necessária');
       }
 
       logger.info(`OCR concluído. Confiança: ${result.confidence}%`);

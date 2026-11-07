@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readData, writeData } from '../data/store.js';
+import { readUserData, writeUserData } from '../data/store.js';
 import { confirmCsvImport, parseCsvPreview, undoCsvImport, deleteImportedTransaction } from '../services/csv-import.service.js';
 import { exercisesRepository, documentsRepository, incomeRepository } from '../repositories/irpf.repository.js';
 import { irpfService } from '../services/irpf.service.js';
@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 function resetData() {
-  writeData({
+  writeUserData('user-a', {
     salario: 0,
     contas: [],
     categorias: [],
@@ -26,7 +26,7 @@ test('detecta extrato em padrão brasileiro e classifica saídas e entradas', ()
 02/08/2026;Uber;45,90;;
 03/08/2026;Salario; ;5000,00`;
 
-  const result = parseCsvPreview(csv, { fileName: 'extrato.csv' });
+  const result = parseCsvPreview(csv, { userId: 'user-a', fileName: 'extrato.csv' });
 
   assert.equal(result.errors.length, 0);
   assert.equal(result.records.length, 3);
@@ -42,6 +42,7 @@ test('identifica possíveis duplicatas antes da importação', () => {
 01/08/2026;Supermercado Extra;120,45;;`;
 
   const result = parseCsvPreview(csv, {
+    userId: 'user-a',
     fileName: 'extrato_duplicate.csv',
     existingRecords: [{
       date: '2026-08-01',
@@ -66,7 +67,7 @@ test('normaliza corretamente valores monetários do Nubank e Neon Bank', () => {
 06/08/2026;Nubank simples;1234.56
 07/08/2026;Centavos;0.99`;
 
-  const result = parseCsvPreview(csv, { fileName: 'mixed-formats.csv' });
+  const result = parseCsvPreview(csv, { userId: 'user-a', fileName: 'mixed-formats.csv' });
 
   assert.equal(result.errors.length, 0);
   assert.deepEqual(result.records.map((record) => Number(record.value.toFixed(2))), [
@@ -84,9 +85,11 @@ test('confirmCsvImport atualiza o histórico mensal e mantém a categoria autom�
   resetData();
 
   const result = confirmCsvImport({
+    userId: 'user-a',
     fileName: 'mes.csv',
     records: [
       {
+        userId: 'user-a',
         id: 'r-1',
         date: '2026-08-01',
         description: 'Supermercado Extra',
@@ -104,6 +107,7 @@ test('confirmCsvImport atualiza o histórico mensal e mantém a categoria autom�
         importedAt: '2026-08-12T00:00:00.000Z',
       },
       {
+        userId: 'user-a',
         id: 'r-2',
         date: '2026-08-05',
         description: 'Salário',
@@ -126,7 +130,7 @@ test('confirmCsvImport atualiza o histórico mensal e mantém a categoria autom�
   assert.equal(result.ok, true);
   assert.equal(result.importedCount, 2);
 
-  const data = readData();
+  const data = readUserData('user-a');
   assert.equal(data.historico.length, 1);
   assert.equal(data.historico[0].mes, '2026-08');
   assert.equal(data.historico[0].totalContas, 120.45);
@@ -140,22 +144,23 @@ test('undoCsvImport reverte a importação e recalcula o histórico', () => {
   resetData();
 
   const result = confirmCsvImport({
+    userId: 'user-a',
     fileName: 'revert.csv',
     records: [
-      { id: 'rx-1', date: '2026-09-01', description: 'Supermercado Extra', normalizedDescription: 'supermercado extra', originalDescription: 'Supermercado Extra', value: -120.45, type: 'saída', category: 'Alimentação', subcategory: 'Supermercado', confidence: 0.82, source: 'revert.csv', status: 'importado', line: 2, importSource: 'csv_import', importedAt: '2026-09-12T00:00:00.000Z' },
-      { id: 'rx-2', date: '2026-09-05', description: 'Salário', normalizedDescription: 'salario', originalDescription: 'Salário', value: 4200, type: 'entrada', category: 'Salário e outras receitas', subcategory: 'Salário', confidence: 0.96, source: 'revert.csv', status: 'importado', line: 3, importSource: 'csv_import', importedAt: '2026-09-12T00:00:00.000Z' },
+      { userId: 'user-a', id: 'rx-1', date: '2026-09-01', description: 'Supermercado Extra', normalizedDescription: 'supermercado extra', originalDescription: 'Supermercado Extra', value: -120.45, type: 'saída', category: 'Alimentação', subcategory: 'Supermercado', confidence: 0.82, source: 'revert.csv', status: 'importado', line: 2, importSource: 'csv_import', importedAt: '2026-09-12T00:00:00.000Z' },
+      { userId: 'user-a', id: 'rx-2', date: '2026-09-05', description: 'Salário', normalizedDescription: 'salario', originalDescription: 'Salário', value: 4200, type: 'entrada', category: 'Salário e outras receitas', subcategory: 'Salário', confidence: 0.96, source: 'revert.csv', status: 'importado', line: 3, importSource: 'csv_import', importedAt: '2026-09-12T00:00:00.000Z' },
     ],
   });
 
-  const historyBefore = readData();
+  const historyBefore = readUserData('user-a');
   assert.equal(historyBefore.importHistory.length, 1);
   assert.equal(historyBefore.importedTransactions.length, 2);
 
-  const undo = undoCsvImport(result.historyId);
+  const undo = undoCsvImport('user-a', result.historyId);
   assert.equal(undo.ok, true);
   assert.equal(undo.revertedCount, 2);
 
-  const next = readData();
+  const next = readUserData('user-a');
   assert.equal(next.importHistory.length, 0);
   assert.equal(next.importedTransactions.length, 0);
   assert.deepEqual(next.historico, []);
@@ -165,18 +170,19 @@ test('deleteImportedTransaction remove uma linha de importação e recalcula o m
   resetData();
 
   const result = confirmCsvImport({
+    userId: 'user-a',
     fileName: 'single.csv',
     records: [
-      { id: 'single-1', date: '2026-10-01', description: 'Uber', normalizedDescription: 'uber', originalDescription: 'Uber', value: -45.9, type: 'saída', category: 'Transporte', subcategory: 'Aplicativos', confidence: 0.76, source: 'single.csv', status: 'importado', line: 2, importSource: 'csv_import', importedAt: '2026-10-12T00:00:00.000Z' },
-      { id: 'single-2', date: '2026-10-05', description: 'Salário', normalizedDescription: 'salario', originalDescription: 'Salário', value: 3300, type: 'entrada', category: 'Salário e outras receitas', subcategory: 'Salário', confidence: 0.96, source: 'single.csv', status: 'importado', line: 3, importSource: 'csv_import', importedAt: '2026-10-12T00:00:00.000Z' },
+      { userId: 'user-a', id: 'single-1', date: '2026-10-01', description: 'Uber', normalizedDescription: 'uber', originalDescription: 'Uber', value: -45.9, type: 'saída', category: 'Transporte', subcategory: 'Aplicativos', confidence: 0.76, source: 'single.csv', status: 'importado', line: 2, importSource: 'csv_import', importedAt: '2026-10-12T00:00:00.000Z' },
+      { userId: 'user-a', id: 'single-2', date: '2026-10-05', description: 'Salário', normalizedDescription: 'salario', originalDescription: 'Salário', value: 3300, type: 'entrada', category: 'Salário e outras receitas', subcategory: 'Salário', confidence: 0.96, source: 'single.csv', status: 'importado', line: 3, importSource: 'csv_import', importedAt: '2026-10-12T00:00:00.000Z' },
     ],
   });
 
-  const deleted = deleteImportedTransaction('single-1');
+  const deleted = deleteImportedTransaction('user-a', 'single-1');
   assert.equal(deleted.ok, true);
   assert.equal(deleted.removed, true);
 
-  const after = readData();
+  const after = readUserData('user-a');
   assert.equal(after.importedTransactions.length, 1);
   assert.equal(after.historico[0].mes, '2026-10');
   assert.equal(after.historico[0].rendaTotal, 3300);

@@ -72,15 +72,6 @@ export const authService = {
       await emailService.sendVerificationCode(user.email, code, 60);
       logger.info('[EMAIL] email service returned', { userId: user.id, email: safeEmail });
 
-      const totalUsers = usersRepository.countUsers();
-      if (totalUsers === 1) {
-        try {
-          usersRepository.assignLegacyDataToUser(user.id);
-        } catch (err) {
-          // fail silently; not critical
-        }
-      }
-
       const result: any = { user: { id: user.id, name: user.name, email: user.email, is_verified: false } };
       if (process.env.NODE_ENV === 'test') result.verification_code = code;
       return result;

@@ -132,8 +132,8 @@ export function Header() {
         >
           {userInitials}
         </div>
-        <button className="ghost-button" onClick={() => logout()} title="Sair">
-          <LogOut size={16} />
+        <button className="ghost-button" onClick={() => logout()} title="Sair" aria-label="Sair">
+          <LogOut size={16} aria-hidden="true" />
         </button>
       </div>
 

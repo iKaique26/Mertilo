@@ -14,7 +14,7 @@ export const authController = {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao registrar usuário';
       const normalized = message.toLowerCase();
-      const clientMessage = normalized.includes('brevo') || normalized.includes('key not found') || normalized.includes('falha no envio') || normalized.includes('api')
+      const clientMessage = normalized.includes('key not found') || normalized.includes('falha no envio') || normalized.includes('api')
         ? 'Não foi possível concluir o cadastro. Verifique o e-mail e tente novamente.'
         : message;
       return badRequest(res, clientMessage);

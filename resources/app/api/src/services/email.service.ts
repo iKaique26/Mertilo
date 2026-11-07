@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger.js';
-import { BrevoApiEmailProvider, MockEmailProvider, SmtpEmailProvider, type EmailMessage, type EmailProvider } from './email-provider.js';
+import { BrevoEmailProvider, MailtrapEmailProvider, MockEmailProvider, type EmailMessage, type EmailProvider } from './email-provider.js';
 
 function maskEmail(email: string) {
   const normalized = (email ?? '').trim();
@@ -27,68 +27,32 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;');
 }
 
-function isBrevoApiConfigured() {
-  const apiKey = getStringEnv('BREVO_API_KEY');
-  const sender = getStringEnv('SMTP_FROM') || getStringEnv('SMTP_FROM_EMAIL');
-  return Boolean(apiKey && sender);
+function isMailtrapConfigured() {
+  const apiToken = getStringEnv('MAILTRAP_API_TOKEN');
+  const fromEmail = getStringEnv('MAILTRAP_FROM_EMAIL') || getStringEnv('MAILTRAP_FROM') || getStringEnv('SMTP_FROM_EMAIL');
+  if (apiToken && fromEmail) return true;
+  const host = getStringEnv('MAILTRAP_HOST') || getStringEnv('SMTP_HOST');
+  const user = getStringEnv('MAILTRAP_USER') || getStringEnv('SMTP_USER');
+  const pass = getStringEnv('MAILTRAP_PASS') || getStringEnv('SMTP_PASS');
+  return Boolean(host && user && pass && fromEmail);
 }
 
-function isSmtpConfigured() {
-  const smtpHost = getStringEnv('SMTP_HOST');
-  const smtpUser = getStringEnv('SMTP_USER') || getStringEnv('SMTP_USERNAME');
-  const smtpPass = getStringEnv('SMTP_PASS') || getStringEnv('SMTP_PASSWORD');
-  const smtpFrom = getStringEnv('SMTP_FROM') || getStringEnv('SMTP_FROM_EMAIL');
-  return Boolean(smtpHost && smtpUser && smtpPass && smtpFrom);
+function getProviderPreference(): 'mailtrap' | 'brevo' | 'hybrid' | 'mock' {
+  if (process.env.NODE_ENV === 'test') return 'mock';
+  const value = (process.env.EMAIL_PROVIDER ?? 'mock').trim().toLowerCase();
+  return value === 'mailtrap' || value === 'brevo' || value === 'hybrid' ? value : 'mock';
 }
 
-function getProviderPreference(): 'auto' | 'brevo-api' | 'smtp' | 'mock' {
-  const value = (process.env.EMAIL_PROVIDER ?? 'auto').trim().toLowerCase();
-  if (value === 'brevo-api' || value === 'brevoapi') return 'brevo-api';
-  if (value === 'smtp') return 'smtp';
-  if (value === 'mock') return 'mock';
-  return 'auto';
-}
-
-function isFallbackToSmtpEnabled() {
-  return getBooleanEnv('EMAIL_FALLBACK_TO_SMTP');
+function isLocalDevelopment() {
+  return process.env.NODE_ENV !== 'production';
 }
 
 function getProviderChain(): EmailProvider[] {
-  if (process.env.NODE_ENV === 'test') return [new MockEmailProvider()];
-
-  const preferred = getProviderPreference();
-  const providers: EmailProvider[] = [];
-
-  if (preferred === 'mock') return [new MockEmailProvider()];
-
-  if (preferred === 'brevo-api') {
-    if (isBrevoApiConfigured()) return [new BrevoApiEmailProvider()];
-    throw new Error('Configuração da API Brevo incompleta. Defina BREVO_API_KEY e SMTP_FROM antes de enviar e-mails.');
-  }
-
-  if (preferred === 'smtp') {
-    if (isSmtpConfigured()) return [new SmtpEmailProvider()];
-    throw new Error('Configuração SMTP do Brevo incompleta. Defina SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM antes de enviar e-mails.');
-  }
-
-  if (isBrevoApiConfigured()) providers.push(new BrevoApiEmailProvider());
-  if (isSmtpConfigured()) providers.push(new SmtpEmailProvider());
-
-  if (providers.length === 0) {
-    throw new Error('Nenhum provedor de e-mail configurado. Defina BREVO_API_KEY ou SMTP_HOST/SMTP_USER/SMTP_PASS/SMTP_FROM.');
-  }
-
-  return providers;
-}
-
-function shouldTryFallbackToSmtp(primaryProvider: EmailProvider, error: unknown): boolean {
-  if (!isFallbackToSmtpEnabled() || !isSmtpConfigured()) return false;
-  if (!(primaryProvider instanceof BrevoApiEmailProvider)) return false;
-
-  const reason = error instanceof Error ? error.message : String(error);
-  const message = reason.toLowerCase();
-  if (message.includes('accepted') || message.includes('already sent') || message.includes('duplicate')) return false;
-  return true;
+  const preference = getProviderPreference();
+  if (preference === 'mailtrap') return isMailtrapConfigured() ? [new MailtrapEmailProvider()] : [new MockEmailProvider()];
+  if (preference === 'brevo') return [new BrevoEmailProvider()];
+  if (preference === 'hybrid') return [new BrevoEmailProvider(), new MailtrapEmailProvider()];
+  return [new MockEmailProvider()];
 }
 
 export function buildVerificationEmail(code: string, expiresInMinutes = 60) {
@@ -155,21 +119,15 @@ export function buildPasswordResetEmail(link: string) {
 
 export const emailService = {
   isConfigured() {
-    return isBrevoApiConfigured() || isSmtpConfigured();
+    return isMailtrapConfigured() || getProviderPreference() === 'mock';
   },
 
   logConfigurationStatus() {
-    if (isBrevoApiConfigured()) {
-      logger.info('API do Brevo configurada e pronta para envio real de e-mails.');
+    if (isMailtrapConfigured()) {
+      logger.info('Mailtrap configurado e pronto para envio real de e-mails.');
       return;
     }
-
-    if (isSmtpConfigured()) {
-      logger.info('SMTP do Brevo configurado e pronto para envio real de e-mails.');
-      return;
-    }
-
-    logger.warn('Configuração de e-mail do Brevo incompleta. Defina BREVO_API_KEY ou SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM antes de enviar e-mails.');
+    logger.warn('Mailtrap não configurado. Testes locais usam MockEmailProvider. Defina MAILTRAP_API_TOKEN e MAILTRAP_FROM_EMAIL.');
   },
 
   async sendMail(to: string, subject: string, text: string, html?: string) {
@@ -180,8 +138,8 @@ export const emailService = {
     for (let index = 0; index < providers.length; index += 1) {
       const provider = providers[index];
       const providerName = provider.constructor.name;
-      const smtpConfigured = isSmtpConfigured();
-      logger.info('[EMAIL] provider selected', { provider: providerName, recipient: maskEmail(to), sender: smtpConfigured ? 'configured' : 'missing', subject });
+      const mailtrapConfigured = isMailtrapConfigured();
+      logger.info('[EMAIL] provider selected', { provider: providerName, recipient: maskEmail(to), sender: mailtrapConfigured ? 'configured' : 'mock', subject });
 
       try {
         const result = await provider.send(message);
@@ -191,18 +149,13 @@ export const emailService = {
         lastError = error;
         const raw = error instanceof Error ? error.message : 'Erro ao enviar e-mail';
         logger.warn('[EMAIL] provider error', { provider: providerName, recipient: maskEmail(to), subject, reason: raw });
-
-        const canFallback = index === 0 && shouldTryFallbackToSmtp(provider, error) && providers.some((candidate) => candidate instanceof SmtpEmailProvider);
-        if (canFallback) {
-          logger.warn('[EMAIL] attempting fallback provider after primary failure', { primary: providerName, alternate: 'SmtpEmailProvider', recipient: maskEmail(to) });
-          continue;
-        }
-
+        if (index < providers.length - 1) continue;
         throw error;
       }
     }
 
     const raw = lastError instanceof Error ? lastError.message : 'Erro ao enviar e-mail';
+    throw new Error(`Não foi possível enviar o e-mail no momento. Motivo do provedor: ${raw}`);
     throw new Error(`Não foi possível enviar o e-mail no momento. Motivo do provedor: ${raw}`);
   },
 

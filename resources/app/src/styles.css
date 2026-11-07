@@ -243,6 +243,31 @@ button {
   gap: 18px;
 }
 
+.stat-card.positive .stat-value { color: #4ade80; }
+.stat-card.negative .stat-value { color: #f87171; }
+.expense-highlight {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 16px;
+  background: rgba(251, 191, 36, 0.1);
+  color: #fde68a;
+}
+.expense-highlight span { color: var(--muted); }
+.category-row-top { padding: 0.6rem; border-radius: 12px; background: rgba(139, 92, 246, 0.1); }
+.category-rank { margin-right: 0.5rem; color: #c4b5fd; font-size: 0.72rem; font-weight: 700; }
+
+@media (max-width: 760px) {
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .expense-highlight { flex-direction: column; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
+
 .stat-card {
   border-radius: 22px;
   padding: 20px 18px;

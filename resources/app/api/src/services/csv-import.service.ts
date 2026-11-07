@@ -1,4 +1,26 @@
-import { readData, writeData } from '../data/store.js';
+import { readUserData, writeUserData } from '../data/store.js';
+import { exercisesRepository } from '../modules/irpf/repositories/exercise.repository.js';
+import { incomeRepository } from '../modules/irpf/repositories/income.repository.js';
+
+function syncIncomeToIrpf(records: ImportRecord[], userId: string): void {
+  for (const record of records.filter((item) => item.type === 'entrada' && /sal[aá]rio|holerite|remunera[cç][aã]o/i.test(`${item.category} ${item.description}`))) {
+    const year = Number(record.date.slice(0, 4));
+    const month = Number(record.date.slice(5, 7));
+    if (!year || !month) continue;
+    let exercise = exercisesRepository.getByYear(year, userId);
+    if (!exercise) {
+      try {
+        exercise = exercisesRepository.create(year, userId);
+      } catch (error: any) {
+        if (error?.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw error;
+        return;
+      }
+    }
+    const source = `financial-import:${record.id}`;
+    if (incomeRepository.getAll(exercise.id, userId).some((income) => income.source === source)) continue;
+    incomeRepository.create(exercise.id, { exercise_id: exercise.id, income_type: 'salary', description: record.description, amount: Number(record.value) || 0, month, source, confidence_score: record.confidence || 100, is_verified: false });
+  }
+}
 
 export type ImportDirection = 'entrada' | 'saída' | 'transferencia';
 
@@ -14,6 +36,7 @@ export interface ImportColumnMapping {
 }
 
 export interface ImportRecord {
+  userId: string;
   id: string;
   date: string;
   description: string;
@@ -356,11 +379,17 @@ function buildDuplicateMatchKey(record: { date: string; description: string; val
   return `${record.date}::${Math.abs(record.value).toFixed(2)}::${normalizeDescription(record.description)}`;
 }
 
-function getExistingImportedTransactions(): any[] {
-  return readData().importedTransactions || [];
+function requireUserId(userId: string | undefined): string {
+  if (!userId || !userId.trim()) throw new Error('Contexto de usuário obrigatório.');
+  return userId;
 }
 
-export function parseCsvPreview(rawCsv: string, options: { fileName?: string; mapping?: Partial<ImportColumnMapping>; existingRecords?: any[] } = {}): CsvImportPreview {
+function getExistingImportedTransactions(userId: string): any[] {
+  return readUserData(userId).importedTransactions || [];
+}
+
+export function parseCsvPreview(rawCsv: string, options: { userId?: string; fileName?: string; mapping?: Partial<ImportColumnMapping>; existingRecords?: any[] } = {}): CsvImportPreview {
+  const userId = requireUserId(options.userId);
   const text = String(rawCsv || '').trim();
   if (!text) {
     return {
@@ -389,7 +418,7 @@ export function parseCsvPreview(rawCsv: string, options: { fileName?: string; ma
   const suggestedMapping = { ...buildSuggestedMapping(headers), ...(options.mapping || {}) };
   const allRecords: ImportRecord[] = [];
   const errors: Array<{ line: number; message: string }> = [];
-  const existing = options.existingRecords || getExistingImportedTransactions();
+  const existing = options.existingRecords || getExistingImportedTransactions(userId);
 
   const seenHashes = new Map<string, number>();
   for (const existingItem of existing) {
@@ -442,6 +471,7 @@ export function parseCsvPreview(rawCsv: string, options: { fileName?: string; ma
     }
 
     const record: ImportRecord = {
+      userId,
       id: `${Date.now()}-${i}`,
       date: parsedDate,
       description: normalizedDescription,
@@ -485,12 +515,13 @@ export function parseCsvPreview(rawCsv: string, options: { fileName?: string; ma
   };
 }
 
-function ensureCategory(data: any, categoryName: string): void {
+function ensureCategory(data: any, categoryName: string, userId: string): void {
   const name = (categoryName || '').trim();
   if (!name) return;
 
   const existing = (data.categorias || []).find((category: any) =>
-    (category?.nome || '').toLowerCase() === name.toLowerCase()
+    (category?.nome || '').toLowerCase() === name.toLowerCase() &&
+    (!category?.userId || category.userId === userId)
   );
 
   if (existing) return;
@@ -500,6 +531,7 @@ function ensureCategory(data: any, categoryName: string): void {
     ...(data.categorias || []),
     {
       id: `cat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      userId,
       nome: name,
       cor: palette[(data.categorias || []).length % palette.length],
       percentual: 0.05,
@@ -517,45 +549,22 @@ function getMonthKey(date: string): string | null {
   return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function upsertMonthHistory(data: any, record: ImportRecord): void {
-  const monthKey = getMonthKey(record.date);
-  if (!monthKey) return;
-
-  const monthEntry = (data.historico || []).find((entry: any) => entry.mes === monthKey) || {
-    id: `monthly-${monthKey}`,
-    mes: monthKey,
-    salario: 0,
-    totalContas: 0,
-    saldoDisponivel: 0,
-    distribuicao: [],
-    totalExtras: 0,
-    rendaTotal: 0,
-    extras: [],
-    criadoEm: new Date().toISOString(),
-  };
-
-  const expenseDelta = record.type === 'saída' ? Math.abs(Number(record.value) || 0) : 0;
-  const incomeDelta = record.type === 'entrada' ? Math.abs(Number(record.value) || 0) : 0;
-
-  monthEntry.totalContas = Number((Number(monthEntry.totalContas || 0) + expenseDelta).toFixed(2));
-  monthEntry.rendaTotal = Number((Number(monthEntry.rendaTotal || 0) + incomeDelta).toFixed(2));
-  monthEntry.saldoDisponivel = Number((monthEntry.rendaTotal - monthEntry.totalContas).toFixed(2));
-
-  if (!data.historico.some((entry: any) => entry.mes === monthKey)) {
-    data.historico.push(monthEntry);
-  }
-}
-
-function rebuildImportedMonthHistory(data: any): void {
-  const existingHistory = Array.isArray(data.historico) ? data.historico.filter((entry: any) => !String(entry?.id || '').startsWith('monthly-')) : [];
+export function rebuildImportedMonthHistory(data: any, userId?: string): void {
+  const ownerId = requireUserId(userId);
+  const history = Array.isArray(data.historico) ? data.historico : [];
+  const existingHistory = history.filter((entry: any) =>
+    !String(entry?.id || '').startsWith('monthly-') || entry.userId !== ownerId
+  );
   const monthMap = new Map<string, any>();
 
   for (const record of Array.isArray(data.importedTransactions) ? data.importedTransactions : []) {
+    if (record?.userId !== ownerId) continue;
     const monthKey = getMonthKey(record.date);
     if (!monthKey) continue;
 
     const current = monthMap.get(monthKey) || {
-      id: `monthly-${monthKey}`,
+      id: `monthly-${ownerId}-${monthKey}`,
+      userId: ownerId,
       mes: monthKey,
       salario: 0,
       totalContas: 0,
@@ -579,16 +588,17 @@ function rebuildImportedMonthHistory(data: any): void {
   data.historico = [...existingHistory, ...Array.from(monthMap.values()).sort((a, b) => a.mes.localeCompare(b.mes))];
 }
 
-export function deleteImportedTransaction(transactionId: string): { ok: boolean; removed: boolean; transactionId?: string; reason?: string } {
-  const data = readData();
+export function deleteImportedTransaction(userId: string | undefined, transactionId: string): { ok: boolean; removed: boolean; transactionId?: string; reason?: string } {
+  const ownerId = requireUserId(userId);
+  const data = readUserData(ownerId);
   const currentTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions : [];
-  const target = currentTransactions.find((record: any) => record.id === transactionId);
+  const target = currentTransactions.find((record: any) => record.id === transactionId && record.userId === ownerId);
 
   if (!target) {
     return { ok: false, removed: false, reason: 'Transação não encontrada' };
   }
 
-  data.importedTransactions = currentTransactions.filter((record: any) => record.id !== transactionId);
+  data.importedTransactions = currentTransactions.filter((record: any) => !(record.id === transactionId && record.userId === ownerId));
   data.importHistory = Array.isArray(data.importHistory) ? data.importHistory.map((batch: any) => {
     const nextTransactions = Array.isArray(batch.transactions) ? batch.transactions.filter((record: any) => record.id !== transactionId) : [];
     const summary = batch.summary || { total: 0, imported: 0, duplicates: 0, invalid: 0, toReview: 0 };
@@ -605,67 +615,73 @@ export function deleteImportedTransaction(transactionId: string): { ok: boolean;
     };
   }) : [];
 
-  rebuildImportedMonthHistory(data);
-  writeData(data);
+  rebuildImportedMonthHistory(data, ownerId);
+  writeUserData(ownerId, data);
 
   return { ok: true, removed: true, transactionId };
 }
 
-export function undoCsvImport(importId: string): { ok: boolean; revertedCount: number; importId?: string; reason?: string } {
-  const data = readData();
+export function undoCsvImport(userId: string | undefined, importId: string): { ok: boolean; revertedCount: number; importId?: string; reason?: string } {
+  const ownerId = requireUserId(userId);
+  const data = readUserData(ownerId);
   const currentImports = Array.isArray(data.importHistory) ? data.importHistory : [];
-  const batch = currentImports.find((entry: any) => entry.id === importId);
+  const batch = currentImports.find((entry: any) => entry.id === importId && entry.userId === ownerId);
 
   if (!batch) {
     return { ok: false, revertedCount: 0, reason: 'Importação não encontrada' };
   }
 
   const removedIds = new Set((Array.isArray(batch.transactions) ? batch.transactions : []).map((record: any) => record.id));
-  data.importHistory = currentImports.filter((entry: any) => entry.id !== importId);
-  data.importedTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions.filter((record: any) => !removedIds.has(record.id)) : [];
+  data.importHistory = currentImports.filter((entry: any) => !(entry.id === importId && entry.userId === ownerId));
+  data.importedTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions.filter((record: any) => !(removedIds.has(record.id) && record.userId === ownerId)) : [];
 
-  rebuildImportedMonthHistory(data);
-  writeData(data);
+  rebuildImportedMonthHistory(data, ownerId);
+  writeUserData(ownerId, data);
 
   return { ok: true, revertedCount: removedIds.size, importId };
 }
 
-export function confirmCsvImport(payload: { records: ImportRecord[]; fileName?: string }): { ok: boolean; importedCount: number; historyId: string; summary: { total: number; imported: number; duplicates: number; invalid: number; toReview: number }; } {
-  const data = readData();
+export function confirmCsvImport(payload: { userId?: string; records: ImportRecord[]; fileName?: string }): { ok: boolean; importedCount: number; historyId: string; summary: { total: number; imported: number; duplicates: number; invalid: number; toReview: number }; } {
+  const ownerId = requireUserId(payload.userId);
+  const data = readUserData(ownerId);
   const records = Array.isArray(payload.records) ? payload.records : [];
   const validRecords = records.filter((record) => !record.potentialDuplicate && !record.manualReview && !!record.date && Number.isFinite(record.value));
 
+  const ownerRecords = validRecords.map((record) => ({ ...record, userId: ownerId }));
   const importBatch = {
+    userId: ownerId,
     id: `import-${Date.now()}`,
     fileName: payload.fileName || 'importacao.csv',
     importedAt: new Date().toISOString(),
     summary: {
       total: records.length,
-      imported: validRecords.length,
+      imported: ownerRecords.length,
       duplicates: records.filter((record) => record.potentialDuplicate).length,
       invalid: 0,
       toReview: records.filter((record) => record.manualReview).length,
     },
-    transactions: validRecords,
+    transactions: ownerRecords,
   };
 
   const existingImports = Array.isArray(data.importHistory) ? data.importHistory : [];
   const existingTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions : [];
 
   for (const record of validRecords) {
-    ensureCategory(data, record.category);
-    upsertMonthHistory(data, record);
+    ensureCategory(data, record.category, ownerId);
   }
 
-  const importedTransactions = [...existingTransactions, ...validRecords.map((record) => ({
+  const importedTransactions = [...existingTransactions, ...ownerRecords.map((record) => ({
     ...record,
+    userId: ownerId,
     value: Number(record.value.toFixed(2)),
     duplicateHash: record.duplicateHash || buildDuplicateHash(record as any),
   }))];
 
   data.importHistory = [importBatch, ...existingImports];
   data.importedTransactions = importedTransactions;
-  writeData(data);
+  rebuildImportedMonthHistory(data, ownerId);
+  writeUserData(ownerId, data);
+  syncIncomeToIrpf(ownerRecords, ownerId);
 
   return {
     ok: true,

@@ -9,14 +9,16 @@ export const salaryService = {
   /**
    * Retorna o salário atual
    */
-  async get(): Promise<number> {
-    return salaryRepository.get();
+  async get(userId?: string): Promise<number> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
+    return salaryRepository.get(userId);
   },
 
   /**
    * Atualiza o salário com validação
    */
-  async set(salary: number): Promise<number> {
+  async set(salary: number, userId?: string): Promise<number> {
+    if (!userId) throw new Error('Contexto de usuário obrigatório.');
     // Validações de negócio
     if (typeof salary !== 'number' || salary < 0) {
       throw new Error('Salário deve ser um número não-negativo');
@@ -26,6 +28,6 @@ export const salaryService = {
       throw new Error('Salário deve ser um número válido');
     }
 
-    return salaryRepository.set(salary);
+    return salaryRepository.set(salary, userId);
   },
 };
