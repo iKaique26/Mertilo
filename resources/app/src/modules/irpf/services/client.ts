@@ -2,7 +2,7 @@
  * Cliente HTTP base para comunicação com API
  */
 
-const API_BASE_URL = 'http://127.0.0.1:5000/api';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api').replace(/\/$/, '');
 
 interface RequestOptions extends RequestInit {
   query?: Record<string, string | number>;

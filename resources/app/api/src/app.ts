@@ -49,18 +49,10 @@ const configuredOrigins = (process.env.MERTILO_ALLOWED_ORIGIN ?? '')
 for (const origin of configuredOrigins) allowedOrigins.add(origin);
 
 app.use(cors({
-  origin(origin, callback) {
-    // Somente aceita origin explícita ou requisições sem Origin (health checks locais).
-    // Em desktop local, a origem das telas embutidas costuma ser "null".
-    if (!origin || allowedOrigins.has(origin)) {
-      callback(null, true);
-      return;
-    }
-
-    callback(new Error('Origem não permitida pelo CORS.'));
-  },
-  credentials: false,
+  origin: ['http://localhost:5173', 'https://www.mertiloo.com.br', 'https://mertiloo.com.br'],
+  credentials: true
 }));
+
 app.use(express.json());
 app.use(morgan('dev'));
 app.use((req, _res, next) => {
