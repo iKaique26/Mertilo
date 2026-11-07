@@ -49,8 +49,14 @@ const configuredOrigins = (process.env.MERTILO_ALLOWED_ORIGIN ?? '')
 for (const origin of configuredOrigins) allowedOrigins.add(origin);
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://www.mertiloo.com.br', 'https://mertiloo.com.br'],
-  credentials: true
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('Origem não permitida pelo CORS.'));
+  },
+  credentials: true,
 }));
 
 app.use(express.json());

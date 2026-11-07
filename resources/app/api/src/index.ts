@@ -44,8 +44,8 @@ async function start() {
     const db = getDatabase();
     app.set('db', db);
 
-    app.listen(port, '127.0.0.1', () => {
-      logger.info(`✅ Servidor rodando em http://127.0.0.1:${port}`);
+    app.listen(port, '0.0.0.0', () => {
+      logger.info(`✅ Servidor rodando na porta ${port}`);
       logger.info(`📚 Documentação: http://localhost:${port}/api-docs`);
     });
   } catch (error) {
