@@ -1,13 +1,16 @@
 services:
   - type: web
-    name: mertilo-api
+    name: mertiloo-api
     env: node
     plan: free
     rootDir: resources/app/api
     buildCommand: npm install && npm run build
     startCommand: npm start
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: MERTILO_ALLOWED_ORIGIN
+        value: https://www.mertiloo.com.br,https://mertiloo.com.br
