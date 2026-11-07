@@ -11,9 +11,6 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.3"
   },
-  "optionalDependencies": {
-    "electron": "^26.6.10"
-  },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
     "dev:electron": "concurrently -k \"npm run dev\" \"electron .\" --env ELECTRON_START_URL=http://127.0.0.1:5173",

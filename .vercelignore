@@ -1,0 +1,12 @@
+resources/app/api
+backup
+auditoria-mirofish
+graphify-out
+resources/app/electron
+resources/app/node_modules
+node_modules
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
