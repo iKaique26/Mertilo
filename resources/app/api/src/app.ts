@@ -20,6 +20,7 @@ import { categoryService } from './services/category.service.js';
 import { historyService } from './services/history.service.js';
 import { salaryService } from './services/salary.service.js';
 import { vehicleExpenseService } from './services/vehicle-expense.service.js';
+import { emailService } from './services/email.service.js';
 import { readUserData } from './data/store.js';
 function buildFinancialSummary(data: any, contas: any[], salario: number) {
   const transactions = Array.isArray(data.importedTransactions) ? data.importedTransactions : [];
@@ -42,11 +43,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const swaggerDocument = YAML.load(join(__dirname, '..', 'swagger.yaml'));
 const app = express();
 const allowedOrigins = new Set(['null', 'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:5174', 'http://localhost:5174', 'http://127.0.0.1:5175', 'http://localhost:5175', 'http://127.0.0.1:5176', 'http://localhost:5176']);
-const configuredOrigins = (process.env.MERTILO_ALLOWED_ORIGIN ?? '')
-  .split(',')
+const configuredOrigins = [
+  process.env.FRONTEND_URL ?? '',
+  process.env.MERTILO_ALLOWED_ORIGIN ?? '',
+]
+  .flatMap((value) => value.split(','))
   .map((origin) => origin.trim())
   .filter(Boolean);
 for (const origin of configuredOrigins) allowedOrigins.add(origin);
+for (const origin of ['https://www.mertiloo.com.br', 'https://mertiloo.com.br', 'https://mertiloo-api.onrender.com']) {
+  allowedOrigins.add(origin);
+}
 
 app.use(cors({
   origin(origin, callback) {
@@ -67,6 +74,10 @@ app.use((req, _res, next) => {
 });
 app.get('/', (_req, res) => res.json({ status: 'API rodando', timestamp: new Date().toISOString() }));
 app.get('/api/health', (_req, res) => res.json({ status: 'OK', timestamp: new Date().toISOString() }));
+app.get('/api/health/email', async (_req, res) => {
+  const result = await emailService.diagnose();
+  res.status(result.ok ? 200 : 503).json(result);
+});
 app.get('/api/financas', requireAuth, async (req, res, next) => {
   try {
     const userId = (req as any).user?.id;

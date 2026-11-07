@@ -123,6 +123,7 @@ export const emailService = {
   },
 
   logConfigurationStatus() {
+    console.log('[EMAIL] configuração carregada', { provider: getProviderPreference(), mailtrapConfigured: isMailtrapConfigured(), brevoConfigured: Boolean(getStringEnv('BREVO_API_KEY') && getStringEnv('BREVO_FROM_EMAIL')) });
     if (isMailtrapConfigured()) {
       logger.info('Mailtrap configurado e pronto para envio real de e-mails.');
       return;
@@ -130,7 +131,17 @@ export const emailService = {
     logger.warn('Mailtrap não configurado. Testes locais usam MockEmailProvider. Defina MAILTRAP_API_TOKEN e MAILTRAP_FROM_EMAIL.');
   },
 
+  async diagnose() {
+    const brevo = new BrevoEmailProvider();
+    const mailtrap = new MailtrapEmailProvider();
+    const [brevoResult, mailtrapResult] = await Promise.all([brevo.diagnose(), mailtrap.diagnose()]);
+    const ok = brevoResult.status !== null && brevoResult.status >= 200 && brevoResult.status < 300 || mailtrapResult.status !== null && mailtrapResult.status >= 200 && mailtrapResult.status < 300;
+    console.log('[EMAIL] diagnóstico', { ok, brevo: brevoResult, mailtrap: mailtrapResult });
+    return { ok, provider: getProviderPreference(), 'Mailtrap Configurado': mailtrapResult.configured, 'Brevo Configurado': brevoResult.configured, mailtrap: mailtrapResult, brevo: brevoResult };
+  },
+
   async sendMail(to: string, subject: string, text: string, html?: string) {
+    console.log('[EMAIL] tentativa de envio', { to: maskEmail(to), subject });
     const providers = getProviderChain();
     const message: EmailMessage = { to, subject, text, html };
     let lastError: unknown = null;

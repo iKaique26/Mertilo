@@ -20,6 +20,12 @@ export interface EmailProvider {
   send(message: EmailMessage): Promise<EmailResult>;
 }
 
+export type EmailDiagnostic = {
+  configured: boolean;
+  status: number | null;
+  error?: string;
+};
+
 export class MockEmailProvider implements EmailProvider {
   public calls: EmailMessage[] = [];
 
@@ -41,6 +47,16 @@ export class BrevoEmailProvider implements EmailProvider {
 
   isConfigured() {
     return Boolean(this.apiKey && this.fromEmail);
+  }
+
+  async diagnose(): Promise<EmailDiagnostic> {
+    if (!this.isConfigured()) return { configured: false, status: null };
+    try {
+      const response = await fetch('https://api.brevo.com/v3/account', { headers: { 'api-key': this.apiKey, accept: 'application/json' } });
+      return { configured: true, status: response.status, ...(response.ok ? {} : { error: `HTTP ${response.status}` }) };
+    } catch (error) {
+      return { configured: true, status: null, error: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   async send(message: EmailMessage): Promise<EmailResult> {
@@ -89,6 +105,16 @@ export class MailtrapEmailProvider implements EmailProvider {
 
   isApiConfigured() {
     return Boolean(this.apiToken && this.fromEmail);
+  }
+
+  async diagnose(): Promise<EmailDiagnostic> {
+    if (!this.isApiConfigured()) return { configured: false, status: null };
+    try {
+      const response = await fetch('https://send.api.mailtrap.io/api/accounts', { headers: { Authorization: `Bearer ${this.apiToken}`, accept: 'application/json' } });
+      return { configured: true, status: response.status, ...(response.ok ? {} : { error: `HTTP ${response.status}` }) };
+    } catch (error) {
+      return { configured: true, status: null, error: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   isConfigured() {
