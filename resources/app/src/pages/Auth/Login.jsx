@@ -38,11 +38,23 @@ export default function Login() {
             <span>Mertilo</span>
           </div>
           <div className="login-page__statement">
-            <p className="login-page__eyebrow">Finanças pessoais, em perspectiva</p>
+            <p className="login-page__eyebrow">Plataforma de Finanças Pessoais</p>
             <h1 id="login-brand-title">Clareza para cada decisão.</h1>
-            <p>Organize sua vida financeira em um só lugar, no seu ritmo.</p>
+            <p>Controle patrimonial, fluxo e planejamento integrados com segurança e precisão.</p>
           </div>
-          <div className="login-page__axis" aria-hidden="true"><span /><span /><span /></div>
+          <div className="login-page__graphic" aria-hidden="true">
+            <div className="login-page__graphic-card">
+              <span className="login-page__graphic-label">Patrimônio Líquido</span>
+              <span className="login-page__graphic-val">R$ 148.230,00</span>
+              <div className="login-page__graphic-bars">
+                <span style={{ height: '35%' }} />
+                <span style={{ height: '60%' }} />
+                <span style={{ height: '45%' }} />
+                <span style={{ height: '80%' }} />
+                <span style={{ height: '100%' }} />
+              </div>
+            </div>
+          </div>
         </section>
 
         <section className="login-panel" aria-labelledby="login-title">
