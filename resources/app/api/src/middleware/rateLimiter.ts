@@ -2,7 +2,12 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 
-const identifierKey = process.env.RATE_LIMIT_KEY_SECRET || randomBytes(32).toString('hex');
+const identifierKey = process.env.RATE_LIMIT_KEY_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: RATE_LIMIT_KEY_SECRET must be configured in production');
+  }
+  return randomBytes(32).toString('hex');
+})();
 
 function getClientIp(req: Request): string {
   return req.ip || req.socket.remoteAddress || 'unknown';
