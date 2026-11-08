@@ -22,8 +22,8 @@ export const authController = {
   },
 
   async login(req: Request, res: Response) {
+    const { email, password } = req.body || {};
     try {
-      const { email, password } = req.body || {};
       if (typeof email !== 'string' || typeof password !== 'string') return badRequest(res, 'E-mail e senha são obrigatórios');
       const result = await authService.login(email, password);
       res.json(result);
