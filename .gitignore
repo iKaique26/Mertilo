@@ -33,6 +33,9 @@ release/
 **/.env.*
 !**/.env.example
 
+# Allow .env.example in any directory
+!**/.env.example
+
 # Local database and runtime data
 *.db
 *.sqlite
