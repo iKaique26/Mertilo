@@ -1814,13 +1814,17 @@ textarea::placeholder {
 .login-page__statement h1 { animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
 .login-page__statement>p:last-child { animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both; }
 .login-page__graphic { animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both; }
-.login-panel { animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both; }
+.login-panel { animation: loginFadeRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both; }
 
 /* Logo entrance animation */
 .login-page__logo { animation: loginLogoEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes loginLogoEnter {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
+}
+@keyframes loginFadeRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 .login-panel { display: flex; flex-direction: column; justify-content: center; padding: clamp(34px,5vw,72px); background: rgba(7,17,31,.8); }
 .login-panel__heading h2 { margin: 0; color: #f8fafc; font-size: 2rem; letter-spacing: -.045em; }
