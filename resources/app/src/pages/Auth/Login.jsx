@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 
+// Logo placeholder - replace with actual mirtilo logo when available
+// import logo from '../../assets/mirtilo-logo.svg';
+
 export default function Login() {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -34,18 +37,23 @@ export default function Login() {
       <div className="login-page__frame">
         <section className="login-page__identity" aria-labelledby="login-brand-title">
           <div className="login-page__brand">
-            <span className="login-page__mark" aria-hidden="true">M</span>
+            <span className="login-page__logo" aria-hidden="true">
+              {/* Replace with actual logo when available:
+              <img src={logo} alt="Mertilo" className="login-page__logo-img" />
+              */}
+              <span className="login-page__mark">M</span>
+            </span>
             <span>Mertilo</span>
           </div>
           <div className="login-page__statement">
-            <p className="login-page__eyebrow">Plataforma de Finanças Pessoais</p>
+            <p className="login-page__eyebrow">PLATAFORMA DE FINANÇAS PESSOAIS</p>
             <h1 id="login-brand-title">Clareza para cada decisão.</h1>
             <p>Controle patrimonial, fluxo e planejamento integrados com segurança e precisão.</p>
           </div>
           <div className="login-page__graphic" aria-hidden="true">
             <div className="login-page__graphic-card">
               <span className="login-page__graphic-label">Patrimônio Líquido</span>
-              <span className="login-page__graphic-val">R$ 148.230,00</span>
+              <span className="login-page__graphic-val">R$ ••••••</span>
               <div className="login-page__graphic-bars">
                 <span style={{ height: '35%' }} />
                 <span style={{ height: '60%' }} />
