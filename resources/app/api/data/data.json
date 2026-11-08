@@ -721,16 +721,16 @@
           "totalExtras": 0,
           "rendaTotal": 3300,
           "extras": [],
-          "criadoEm": "2026-11-08T20:15:55.672Z"
+          "criadoEm": "2026-11-08T20:54:43.157Z"
         }
       ],
       "vexpenses": [],
       "importHistory": [
         {
           "userId": "user-a",
-          "id": "import-1794168955666",
+          "id": "import-1794171283149",
           "fileName": "single.csv",
-          "importedAt": "2026-11-08T20:15:55.666Z",
+          "importedAt": "2026-11-08T20:54:43.149Z",
           "summary": {
             "total": 1,
             "imported": 1,

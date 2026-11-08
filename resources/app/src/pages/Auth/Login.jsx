@@ -1,13 +1,14 @@
 import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
-import { Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 
 export default function Login() {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -29,51 +30,88 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-screen">
-      <div className="auth-container">
-        <div className="auth-identity" aria-label="identidade Mertilo">
-          <div className="brand">
-            <div className="brand-mark">M</div>
-            <div>
-              <span className="brand-label">Mertilo</span>
-              <h1>Mertilo</h1>
-            </div>
+    <main className="login-page">
+      <div className="login-page__frame">
+        <section className="login-page__identity" aria-labelledby="login-brand-title">
+          <div className="login-page__brand">
+            <span className="login-page__mark" aria-hidden="true">M</span>
+            <span>Mertilo</span>
           </div>
-          <p>Gestão financeira pessoal</p>
-        </div>
+          <div className="login-page__statement">
+            <p className="login-page__eyebrow">Finanças pessoais, em perspectiva</p>
+            <h1 id="login-brand-title">Clareza para cada decisão.</h1>
+            <p>Organize sua vida financeira em um só lugar, no seu ritmo.</p>
+          </div>
+          <div className="login-page__axis" aria-hidden="true"><span /><span /><span /></div>
+        </section>
 
-        <div className="auth-card">
-          <h2 className="form-title">Entrar</h2>
-          <p className="form-subtitle">Acesse sua conta Mertilo</p>
-          <form onSubmit={handleSubmit} aria-label="login-form">
-            <div className="field input-wrapper">
-              <label className="input-label">E-mail</label>
-              <div className="input-container">
-                <span className="input-icon"><Mail size={16} /></span>
-                <input className="input with-icon" value={email} onChange={(e) => setEmail(e.target.value)} type="email" aria-required="true" />
+        <section className="login-panel" aria-labelledby="login-title">
+          <div className="login-panel__heading">
+            <p className="login-panel__kicker">Acesso à conta</p>
+            <h2 id="login-title">Entrar</h2>
+            <p>Acesse sua conta Mertilo</p>
+          </div>
+          <form onSubmit={handleSubmit} aria-label="login-form" noValidate>
+            <div className="login-field">
+              <label htmlFor="login-email">E-mail</label>
+              <div className="login-field__control">
+                <Mail size={18} aria-hidden="true" />
+                <input
+                  id="login-email"
+                  name="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="voce@exemplo.com"
+                  required
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? 'login-error' : undefined}
+                />
               </div>
             </div>
 
-            <div className="field input-wrapper">
-              <label className="input-label">Senha</label>
-              <div className="input-container">
-                <span className="input-icon"><Lock size={16} /></span>
-                <input className="input with-icon" value={password} onChange={(e) => setPassword(e.target.value)} type="password" aria-required="true" />
+            <div className="login-field">
+              <div className="login-field__label-row">
+                <label htmlFor="login-password">Senha</label>
+                <Link to="/forgot-password">Esqueci minha senha</Link>
+              </div>
+              <div className="login-field__control">
+                <Lock size={18} aria-hidden="true" />
+                <input
+                  id="login-password"
+                  name="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="Sua senha"
+                  required
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? 'login-error' : undefined}
+                />
+                <button
+                  className="login-field__visibility"
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
 
-            {error && <div className="error" role="alert">{error}</div>}
+            {error && <div className="login-panel__error" id="login-error" role="alert">{error}</div>}
 
-            <button className="primary-btn" type="submit" disabled={loading} aria-disabled={loading}>
-              {loading ? <span className="spinner" aria-hidden="true"></span> : 'Entrar'}
+            <button className="login-panel__submit" type="submit" disabled={loading} aria-disabled={loading}>
+              {loading ? <span className="login-panel__spinner" aria-hidden="true" /> : 'Entrar na Mertilo'}
             </button>
           </form>
-          <div className="links">
-            <Link to="/register">Criar conta</Link>
-            <Link to="/forgot-password">Esqueci minha senha</Link>
-          </div>
-        </div>
+          <p className="login-panel__signup">Ainda não usa Mertilo? <Link to="/register">Criar conta</Link></p>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
