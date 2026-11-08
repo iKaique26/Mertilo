@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background / body gradients -->
+    <radialGradient id="berryBody" cx="50%" cy="45%" r="50%" fx="42%" fy="32%">
+      <stop offset="0%" stop-color="#4c3d8f"/>
+      <stop offset="45%" stop-color="#2d1f63"/>
+      <stop offset="85%" stop-color="#18113c"/>
+      <stop offset="100%" stop-color="#0e0a25"/>
+    </radialGradient>
+
+    <radialGradient id="berryHighlight" cx="35%" cy="30%" r="35%">
+      <stop offset="0%" stop-color="#8b7cf6" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#6d5acd" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#4c3d8f" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Leaf gradients -->
+    <linearGradient id="leafGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7ee787"/>
+      <stop offset="40%" stop-color="#3fb950"/>
+      <stop offset="100%" stop-color="#196c2e"/>
+    </linearGradient>
+
+    <linearGradient id="leafGrad2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#56d364"/>
+      <stop offset="50%" stop-color="#2ea043"/>
+      <stop offset="100%" stop-color="#114d23"/>
+    </linearGradient>
+
+    <!-- Calyx / stem gradients -->
+    <linearGradient id="stemGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#85e89d"/>
+      <stop offset="100%" stop-color="#238636"/>
+    </linearGradient>
+
+    <filter id="dropShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Main Berry Body with Shadow -->
+  <g filter="url(#dropShadow)">
+    <circle cx="256" cy="272" r="180" fill="url(#berryBody)"/>
+    <circle cx="256" cy="272" r="180" fill="url(#berryHighlight)"/>
+  </g>
+
+  <!-- Calyx Crown (Top star/crown structure characteristic of blueberries) -->
+  <g fill="url(#stemGrad)" stroke="#114d23" stroke-width="3" stroke-linejoin="round">
+    <!-- Crown segment 1 -->
+    <path d="M 230,175 C 235,130 248,105 256,92 C 264,105 277,130 282,175 C 270,170 256,168 242,170 Z"/>
+    <!-- Crown segment 2 -->
+    <path d="M 280,182 C 320,165 345,150 365,138 C 350,160 325,180 285,195 C 285,190 283,186 280,182 Z"/>
+    <!-- Crown segment 3 -->
+    <path d="M 232,182 C 192,165 167,150 147,138 C 162,160 187,180 227,195 C 227,190 229,186 232,182 Z"/>
+    <!-- Crown segment 4 -->
+    <path d="M 215,200 C 170,195 140,190 115,185 C 135,205 165,215 210,222 C 212,215 214,208 215,200 Z"/>
+    <!-- Crown segment 5 -->
+    <path d="M 297,200 C 342,195 372,190 397,185 C 377,205 347,215 302,222 C 300,215 298,208 297,200 Z"/>
+  </g>
+
+  <!-- Center Depression / Calyx Cavity -->
+  <circle cx="256" cy="182" r="32" fill="#120c29" stroke="#31226b" stroke-width="4"/>
+  <circle cx="256" cy="182" r="14" fill="#070414"/>
+
+  <!-- Organic Leaves Sprouting from Stem -->
+  <!-- Left Leaf -->
+  <path d="M 235,115 C 180,100 120,110 90,140 C 65,165 65,205 95,215 C 130,225 175,185 220,135 Z" fill="url(#leafGrad1)" filter="url(#dropShadow)" stroke="#134721" stroke-width="3" stroke-linecap="round"/>
+  <!-- Left Leaf Vein -->
+  <path d="M 220,135 C 175,150 130,175 98,208" fill="none" stroke="#2ea043" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Right Leaf (Main sweeping leaf) -->
+  <path d="M 268,102 C 330,85 390,110 420,150 C 445,185 435,225 400,235 C 360,245 310,195 260,135 Z" fill="url(#leafGrad2)" filter="url(#dropShadow)" stroke="#0d3819" stroke-width="3" stroke-linecap="round"/>
+  <!-- Right Leaf Vein -->
+  <path d="M 270,130 C 320,150 370,185 405,222" fill="none" stroke="#56d364" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Subtle Rim Light & Reflections for Premium Glass/Berry Finish -->
+  <path d="M 125,230 C 110,270 120,330 150,385" fill="none" stroke="#a78bfa" stroke-width="8" stroke-linecap="round" opacity="0.4"/>
+  <ellipse cx="320" cy="350" rx="45" ry="18" transform="rotate(-30 320 350)" fill="#38bdf8" opacity="0.18"/>
+  <circle cx="185" cy="210" r="12" fill="#ffffff" opacity="0.25"/>
+</svg>

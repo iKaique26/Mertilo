@@ -2,9 +2,7 @@ import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
-
-// Logo placeholder - replace with actual mirtilo logo when available
-// import logo from '../../assets/mirtilo-logo.svg';
+import logo from '../../assets/mirtilo-logo.svg';
 
 export default function Login() {
   const { login } = useContext(AuthContext);
@@ -38,10 +36,7 @@ export default function Login() {
         <section className="login-page__identity" aria-labelledby="login-brand-title">
           <div className="login-page__brand">
             <span className="login-page__logo" aria-hidden="true">
-              {/* Replace with actual logo when available:
               <img src={logo} alt="Mertilo" className="login-page__logo-img" />
-              */}
-              <span className="login-page__mark">M</span>
             </span>
             <span>Mertilo</span>
           </div>
