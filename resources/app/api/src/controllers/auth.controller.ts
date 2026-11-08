@@ -51,7 +51,14 @@ export const authController = {
       await (await import('../services/auth.service.js')).authService.resendVerification(email);
       res.json({ success: true });
     } catch (err) {
+      console.error("Erro ao reenviar verificação:", err);
       const message = err instanceof Error ? err.message : 'Erro';
+      
+      // Se o erro for do provedor de e-mail ou algo inesperado, retornar 500
+      if (message.includes('provedor') || message.includes('Falha no envio')) {
+        return res.status(500).json({ error: message });
+      }
+      
       return badRequest(res, message);
     }
   },
