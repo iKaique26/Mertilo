@@ -12,6 +12,15 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isRevealed, setIsRevealed] = useState(false);
+
+  const handleFocus = () => setIsRevealed(true);
+  const handleBlur = (e) => {
+    // Only hide if neither email nor password is focused
+    if (!e.currentTarget.form?.querySelector('input:focus')) {
+      setIsRevealed(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,7 +42,7 @@ export default function Login() {
   return (
     <main className="login-page">
       <div className="login-page__frame">
-        <section className="login-page__identity" aria-labelledby="login-brand-title">
+        <section className={`login-page__identity ${isRevealed ? 'login-page__identity--revealed' : ''}`} aria-labelledby="login-brand-title">
           <div className="login-page__brand">
             <span className="login-page__logo" aria-hidden="true">
               <img src={logo} alt="Mertilo" className="login-page__logo-img" />
@@ -60,7 +69,7 @@ export default function Login() {
           </div>
         </section>
 
-        <section className="login-panel" aria-labelledby="login-title">
+        <section className={`login-panel ${isRevealed ? 'login-panel--shifted' : ''}`} aria-labelledby="login-title">
           <div className="login-panel__heading">
             <p className="login-panel__kicker">Acesso à conta</p>
             <h2 id="login-title">Entrar</h2>
@@ -76,6 +85,8 @@ export default function Login() {
                   name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
                   type="email"
                   autoComplete="email"
                   inputMode="email"
@@ -99,6 +110,8 @@ export default function Login() {
                   name="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   placeholder="Sua senha"
