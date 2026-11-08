@@ -2,7 +2,7 @@
   "0": "irpf.controller.ts",
   "1": "file-processor.ts",
   "2": "db.ts",
-  "3": "ownership.isolation.test.ts",
+  "3": "src/index.ts",
   "4": "csv-import.service.ts",
   "5": "email.service.ts",
   "6": "migrations.ts",
@@ -18,5 +18,13 @@
   "16": "*",
   "17": "yamljs.d.ts",
   "18": ".eslintrc.js",
-  "19": "migrations_010_users_meta_investments.ts"
+  "19": "migrations_010_users_meta_investments.ts",
+  "20": "irpf.controller.ts",
+  "21": "financial-http-isolation.test.ts",
+  "22": "ref_node_assert",
+  "23": "dependents.repository.test.ts",
+  "24": "two-user.isolation.test.ts",
+  "25": "utils/validation.ts",
+  "26": "ownership.isolation.test.ts",
+  "27": ".send"
 }

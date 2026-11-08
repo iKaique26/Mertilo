@@ -263,7 +263,8 @@ export const irpfController = {
         extracted_data: finalData,
         is_verified: true,
         status: 'extracted',
-      });
+      }, userId);
+      if (!updated) return notFound(res, 'Documento não encontrado');
 
       // Persistir histórico de correções no banco
       try {
