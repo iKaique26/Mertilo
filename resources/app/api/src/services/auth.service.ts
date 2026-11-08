@@ -145,6 +145,7 @@ export const authService = {
     if (!user) throw new Error('Usuário não encontrado');
     if (user.is_verified) throw new Error('Conta já verificada');
 
+    let preferBrevo = false;
     if (process.env.NODE_ENV !== 'test') {
       const latest = usersRepository.getLatestVerificationCode(user.id);
       if (latest && Date.now() - new Date(latest.created_at).getTime() < VERIFICATION_RETRY_INTERVAL_MS) {
@@ -158,16 +159,34 @@ export const authService = {
       if (recentCount >= VERIFICATION_RETRY_MAX_PER_WINDOW) {
         throw new Error('Muitas tentativas de reenvio. Tente novamente mais tarde.');
       }
+
+      // Check if there are previous verification codes *created before this request window*, meaning a prior resend attempt exists
+      const priorCountRow = db.prepare('SELECT COUNT(*) as c FROM verification_codes WHERE user_id = ? AND used = 1').get(user.id) as { c?: number } | undefined;
+      const priorCount = Number(priorCountRow?.c ?? 0);
+      if (priorCount > 0) {
+        preferBrevo = true;
+        logger.info('[EMAIL] Segundo clique (ou posterior) detectado para reenvio de verificação. Priorizando Brevo.', { userId: user.id, priorCount });
+      }
     }
 
-    usersRepository.invalidatePreviousVerificationCodes(user.id);
-    const code = randomNumericCode(6);
-    const codeHash = await bcrypt.hash(code, 10);
-    const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
-    usersRepository.createVerificationCode(user.id, codeHash, expiresAt);
-    await emailService.sendVerificationCode(user.email, code, 60);
-    if (process.env.NODE_ENV === 'test') return { code, email: maskEmail(user.email) };
-    return { success: true, email: maskEmail(user.email) };
+    // Use a transaction to ensure atomicity of invalidation and creation
+    const db = (await import('../database/db.js')).getDatabase();
+    db.exec('BEGIN TRANSACTION');
+    try {
+      usersRepository.invalidatePreviousVerificationCodes(user.id);
+      const code = randomNumericCode(6);
+      const codeHash = await bcrypt.hash(code, 10);
+      const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
+      usersRepository.createVerificationCode(user.id, codeHash, expiresAt);
+      db.exec('COMMIT');
+      
+      await emailService.sendVerificationCode(user.email, code, 60, preferBrevo);
+      if (process.env.NODE_ENV === 'test') return { code, email: maskEmail(user.email) };
+      return { success: true, email: maskEmail(user.email) };
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
   },
 
   async forgotPassword(email: string) {

@@ -47,12 +47,32 @@ function isLocalDevelopment() {
   return process.env.NODE_ENV !== 'production';
 }
 
-function getProviderChain(): EmailProvider[] {
+function getProviderChain(preferBrevo = false): EmailProvider[] {
   const preference = getProviderPreference();
-  if (preference === 'mailtrap') return isMailtrapConfigured() ? [new MailtrapEmailProvider()] : [new MockEmailProvider()];
-  if (preference === 'brevo') return [new BrevoEmailProvider()];
-  if (preference === 'hybrid') return [new BrevoEmailProvider(), new MailtrapEmailProvider()];
-  return [new MockEmailProvider()];
+  if (process.env.NODE_ENV === 'test') return [new MockEmailProvider()];
+  
+  const mailtrap = new MailtrapEmailProvider();
+  const brevo = new BrevoEmailProvider();
+  
+  const mailtrapReady = mailtrap.isConfigured();
+  const brevoReady = brevo.isConfigured();
+
+  if (preferBrevo && brevoReady) {
+    return brevoReady && mailtrapReady ? [brevo, mailtrap] : (brevoReady ? [brevo] : [new MockEmailProvider()]);
+  }
+
+  if (preference === 'mailtrap') {
+    return mailtrapReady ? [mailtrap, ...(brevoReady ? [brevo] : [])] : [new MockEmailProvider()];
+  }
+  if (preference === 'brevo') {
+    return brevoReady ? [brevo, ...(mailtrapReady ? [mailtrap] : [])] : [new MockEmailProvider()];
+  }
+  if (preference === 'hybrid') {
+    return mailtrapReady && brevoReady ? [mailtrap, brevo] : (mailtrapReady ? [mailtrap] : (brevoReady ? [brevo] : [new MockEmailProvider()]));
+  }
+  
+  // Default fallback order: Mailtrap first, Brevo second if configured
+  return mailtrapReady && brevoReady ? [mailtrap, brevo] : (mailtrapReady ? [mailtrap] : (brevoReady ? [brevo] : [new MockEmailProvider()]));
 }
 
 export function buildVerificationEmail(code: string, expiresInMinutes = 60) {
@@ -140,17 +160,16 @@ export const emailService = {
     return { ok, provider: getProviderPreference(), 'Mailtrap Configurado': mailtrapResult.configured, 'Brevo Configurado': brevoResult.configured, mailtrap: mailtrapResult, brevo: brevoResult };
   },
 
-  async sendMail(to: string, subject: string, text: string, html?: string) {
-    console.log('[EMAIL] tentativa de envio', { to: maskEmail(to), subject });
-    const providers = getProviderChain();
+  async sendMail(to: string, subject: string, text: string, html?: string, preferBrevo = false) {
+    console.log('[EMAIL] tentativa de envio', { to: maskEmail(to), subject, preferBrevo });
+    const providers = getProviderChain(preferBrevo);
     const message: EmailMessage = { to, subject, text, html };
     let lastError: unknown = null;
 
     for (let index = 0; index < providers.length; index += 1) {
       const provider = providers[index];
       const providerName = provider.constructor.name;
-      const mailtrapConfigured = isMailtrapConfigured();
-      logger.info('[EMAIL] provider selected', { provider: providerName, recipient: maskEmail(to), sender: mailtrapConfigured ? 'configured' : 'mock', subject });
+      logger.info('[EMAIL] provider selected', { provider: providerName, recipient: maskEmail(to), subject });
 
       try {
         const result = await provider.send(message);
@@ -170,13 +189,13 @@ export const emailService = {
     throw new Error(`Não foi possível enviar o e-mail no momento. Motivo do provedor: ${raw}`);
   },
 
-  async sendVerificationCode(to: string, code: string, expiresInMinutes = 60) {
+  async sendVerificationCode(to: string, code: string, expiresInMinutes = 60, preferBrevo = false) {
     const emailContent = buildVerificationEmail(code, expiresInMinutes);
-    return this.sendMail(to, 'Confirme seu e-mail — Mertilo', emailContent.text, emailContent.html);
+    return this.sendMail(to, 'Confirme seu e-mail — Mertilo', emailContent.text, emailContent.html, preferBrevo);
   },
 
-  async sendPasswordReset(to: string, resetLink: string) {
+  async sendPasswordReset(to: string, resetLink: string, preferBrevo = false) {
     const emailContent = buildPasswordResetEmail(resetLink);
-    return this.sendMail(to, 'Recuperação de senha — Mertilo', emailContent.text, emailContent.html);
+    return this.sendMail(to, 'Recuperação de senha — Mertilo', emailContent.text, emailContent.html, preferBrevo);
   }
 };
