@@ -15,6 +15,7 @@ import financialImportRouter from './modules/financial-import.js';
 import authRouter from './routes/auth.js';
 import { logger } from './utils/logger.js';
 import { requireAuth } from './middleware/auth.middleware.js';
+import { globalRateLimiter, authRateLimiter, loginRateLimiter, registerRateLimiter, passwordResetRateLimiter, resendVerificationRateLimiter, uploadRateLimiter } from './middleware/rateLimiter.js';
 import { accountService } from './services/account.service.js';
 import { categoryService } from './services/category.service.js';
 import { historyService } from './services/history.service.js';
@@ -42,6 +43,8 @@ function buildFinancialSummary(data: any, contas: any[], salario: number) {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const swaggerDocument = YAML.load(join(__dirname, '..', 'swagger.yaml'));
 const app = express();
+// Render supplies one trusted proxy hop; local requests use socket IP directly.
+app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
 const allowedOrigins = new Set(['null', 'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:5174', 'http://localhost:5174', 'http://127.0.0.1:5175', 'http://localhost:5175', 'http://127.0.0.1:5176', 'http://localhost:5176']);
 const configuredOrigins = [
   process.env.FRONTEND_URL ?? '',
@@ -72,6 +75,7 @@ app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`);
   next();
 });
+app.use(globalRateLimiter);
 app.get('/', (_req, res) => res.json({ status: 'API rodando', timestamp: new Date().toISOString() }));
 app.get('/api/health', (_req, res) => res.json({ status: 'OK', timestamp: new Date().toISOString() }));
 app.get('/api/health/email', async (_req, res) => {

@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { irpfController } from '../../controllers/irpf.controller.js';
 import { requireAuth } from '../../middleware/auth.middleware.js';
+import { uploadRateLimiter } from '../../middleware/rateLimiter.js';
 
 const irpfRouter = Router();
 
@@ -24,7 +25,7 @@ irpfRouter.get('/documents/exercise/:exercise_id', irpfController.getDocuments);
 irpfRouter.get('/documents/:id', irpfController.getDocumentById);
 irpfRouter.put('/documents/:id', irpfController.updateDocument);
 irpfRouter.delete('/documents/:id', irpfController.deleteDocument);
-irpfRouter.post('/documents/:exerciseId/upload', irpfController.uploadDocument);
+irpfRouter.post('/documents/:exerciseId/upload', uploadRateLimiter, irpfController.uploadDocument);
 irpfRouter.post('/documents/:id/confirm', irpfController.confirmDocument);
 
 // ===== RENDA =====
