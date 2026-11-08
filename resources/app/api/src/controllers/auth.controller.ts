@@ -29,6 +29,15 @@ export const authController = {
       res.json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao autenticar';
+      console.log(`[LOGIN] Falha para ${email}: ${message}`);
+      
+      if (message === 'Usuário ou senha inválidos') {
+        return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+      }
+      if (message === 'Conta não verificada') {
+        return res.status(403).json({ error: 'E-mail não verificado. Verifique sua caixa de entrada.' });
+      }
+      
       return badRequest(res, message);
     }
   },
