@@ -1730,8 +1730,8 @@ textarea::placeholder {
 
 /* Login-only styles; shared auth routes remain unchanged. */
 .login-page { min-height: 100vh; display: grid; place-items: center; padding: clamp(20px, 4vw, 56px); background: linear-gradient(118deg, #07111f, #101d2d); }
-.login-page__frame { position: relative; width: min(100%, 1080px); min-height: min(680px, calc(100vh - 80px)); overflow: hidden; border: 1px solid rgba(148,163,184,.16); border-radius: 24px; background: rgba(15,23,42,.72); box-shadow: 0 32px 90px rgba(0,0,0,.3); }
-.login-page__identity { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 48px; width: 55%; padding: clamp(34px,5vw,68px); overflow: hidden; background: linear-gradient(145deg,rgba(16,29,45,.9),rgba(7,17,31,.72)); }
+.login-page__frame { position: relative; width: 488px; max-width: 1080px; min-height: min(680px, calc(100vh - 80px)); overflow: hidden; border: 1px solid rgba(148,163,184,.16); border-radius: 24px; background: rgba(15,23,42,.72); box-shadow: 0 32px 90px rgba(0,0,0,.3); transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.login-page__identity { position: absolute; top: 0; left: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 48px; width: 594px; padding: clamp(34px,5vw,68px); opacity: 0; visibility: hidden; transition: opacity 0.4s ease 0.1s, visibility 0.4s ease 0.1s; background: linear-gradient(145deg,rgba(16,29,45,.9),rgba(7,17,31,.72)); }
 .login-page__identity::after { display: none; }
 .login-page__brand { display: inline-flex; align-items: center; gap: 11px; color: #e2e8f0; font-size: 1.05rem; font-weight: 750; letter-spacing: -.02em; }
 .login-page__logo { display: inline-flex; align-items: center; }
@@ -1743,53 +1743,35 @@ textarea::placeholder {
 .login-page__statement>p:last-child { max-width: 365px; margin: 24px 0 0; color: #94a3b8; line-height: 1.65; }
 .login-page__axis { position: relative; z-index: 1; display: none; }
 
-/* Login panel physically covers identity panel until an auth field receives focus. */
+/* Login panel remains fixed width on the right when expanded */
 .login-panel {
-  position: relative;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
   justify-content: center;
   box-sizing: border-box;
-  width: 100%;
+  width: 488px;
   min-height: min(680px, calc(100vh - 80px));
-  margin-left: 0;
   padding: clamp(34px,5vw,72px);
   background: rgba(7,17,31,.98);
-  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: none;
 }
 .login-panel > * { position: relative; z-index: 1; }
 .login-page__identity .login-page__statement,
 .login-page__identity .login-page__graphic { pointer-events: none; }
+.login-page__identity--revealed { opacity: 1; visibility: visible; }
 .login-page__identity--revealed .login-page__statement,
 .login-page__identity--revealed .login-page__graphic { pointer-events: auto; }
-.login-page__identity--revealed ~ .login-panel {
-  width: 45%;
-  margin-left: 55%;
+.login-page__identity--revealed ~ .login-panel,
+.login-panel--shifted {
   border-left: 1px solid rgba(148,163,184,.16);
 }
-
-/* Staggered reveal for child elements */
-.login-page__identity--revealed .login-page__brand {
-  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
-}
-.login-page__identity--revealed .login-page__eyebrow {
-  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
-}
-.login-page__identity--revealed .login-page__statement h1 {
-  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
-}
-.login-page__identity--revealed .login-page__statement>p:last-child {
-  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
-}
-.login-page__identity--revealed .login-page__graphic {
-  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both;
-}
-
-/* Compatibility class mirrors field-focus reveal state. */
-.login-panel--shifted {
-  width: 45%;
-  margin-left: 55%;
+.login-page__frame.login-frame--expanded {
+  width: 1080px;
 }
 
 /* Ensure frame has proper stacking context */

@@ -41,7 +41,7 @@ export default function Login() {
 
   return (
     <main className="login-page">
-      <div className="login-page__frame">
+      <div className={`login-page__frame ${isRevealed ? 'login-frame--expanded' : ''}`}>
         <section className={`login-page__identity ${isRevealed ? 'login-page__identity--revealed' : ''}`} aria-labelledby="login-brand-title">
           <div className="login-page__brand">
             <span className="login-page__logo" aria-hidden="true">
@@ -90,7 +90,7 @@ export default function Login() {
                   type="email"
                   autoComplete="email"
                   inputMode="email"
-                  placeholder="voce@exemplo.com"
+                  placeholder="SeuEmail@exemplo.com"
                   required
                   aria-invalid={Boolean(error)}
                   aria-describedby={error ? 'login-error' : undefined}
