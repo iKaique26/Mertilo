@@ -1,17 +1,17 @@
 # Graph Report - Mertilo  (2026-11-08)
 
 ## Corpus Check
-- 1198 files · ~2,923,086 words
+- 1198 files · ~2,923,953 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 242 file(s) not represented in the graph (top: .db-shm 80, .db-wal 80, .pak 56)
 
 ## Summary
-- 1306 nodes · 2537 edges · 92 communities (74 shown, 18 thin omitted)
+- 1307 nodes · 2539 edges · 91 communities (73 shown, 18 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 54 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fb33ccf9`
+- Built from commit: `237fef76`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -39,7 +39,7 @@
 - file-processor.ts
 - .eslintrc.json
 - compilerOptions
-- App.jsx
+- lucide-react
 - auth.service.ts
 - Dashboard/index.jsx
 - Template Conversion Rules
@@ -52,7 +52,7 @@
 - TaxIRPFContext.tsx
 - api/src/controllers/salary.controller.ts
 - ref_fs
-- IRPFDependents
+- react
 - Header.jsx
 - *
 - AGENTS.md
@@ -71,11 +71,11 @@
 - Quick reference
 - api/src/schemas/validation.ts
 - main.cjs
-- api/src/data/store.ts
+- App.jsx
 - financial-http-isolation.test.ts
 - Managing Mailtrap contacts
 - Quick reference
-- dependencies
+- ref_node_test
 - pre-phase-3/src/types.ts
 - pre-phase-3/src/utils/http.ts
 - Assistant/index.jsx
@@ -86,7 +86,6 @@
 - Converting email templates
 - policy
 - ref_node_assert
-- csv-import.test.ts
 - api/src/index.ts
 - Authorizing Mailtrap API requests
 - database/index.ts
@@ -126,19 +125,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (92 total, 18 thin omitted)
+## Communities (91 total, 18 thin omitted)
 
 ### Community 0 - "apiCall"
-Cohesion: 0.14
-Nodes (28): App(), AuthProvider(), init(), getAlertDescription(), IRPFAlerts(), loadAlerts(), resolveAlert(), IRPFAssets() (+20 more)
+Cohesion: 0.15
+Nodes (25): AuthProvider(), init(), IRPFAssets(), handleAddAsset(), handleDeleteAsset(), loadAssets(), IRPFDeductions(), handleAddDeduction() (+17 more)
 
 ### Community 1 - "irpf.controller.ts"
 Cohesion: 0.23
 Nodes (22): createAsset(), deleteAsset(), getAssetById(), getAssets(), updateAsset(), createDeduction(), deleteDeduction(), getDeductionById() (+14 more)
 
 ### Community 2 - "csv-import.service.ts"
-Cohesion: 0.19
-Nodes (19): buildDuplicateHash(), buildDuplicateMatchKey(), buildSuggestedMapping(), classifyTransaction(), CsvImportPreview, DEFAULT_CATEGORIES, detectDelimiter(), getExistingImportedTransactions() (+11 more)
+Cohesion: 0.10
+Nodes (44): DATA_FILE, DEFAULT_CATEGORIES, defaultData(), ensureDataFile(), moduleDir, normalizeData(), normalizeOwnerData(), OwnerData (+36 more)
 
 ### Community 3 - "pre-phase-3/src/app.ts"
 Cohesion: 0.14
@@ -170,7 +169,7 @@ Nodes (11): accountSchema, categorySchema, historySchema, salarySchema, vehicleE
 
 ### Community 11 - "FinancialContext.tsx"
 Cohesion: 0.09
-Nodes (20): FinancialContext, FinancialProvider(), financialReducer(), initialState, formatCurrency(), ImportacaoFinanceira(), previewFallback, financialService (+12 more)
+Nodes (16): formatCurrency(), ImportacaoFinanceira(), previewFallback, financialService, financialImportService, Account, AppData, Category (+8 more)
 
 ### Community 12 - "converter.py"
 Cohesion: 0.09
@@ -216,9 +215,9 @@ Nodes (14): eslint:recommended, env, browser, es2021, node, extends, parserOptio
 Cohesion: 0.14
 Nodes (13): compilerOptions, esModuleInterop, forceConsistentCasingInFileNames, lib, module, moduleResolution, outDir, rootDir (+5 more)
 
-### Community 23 - "App.jsx"
-Cohesion: 0.21
-Nodes (10): lucide-react, react, react-router-dom, RequireAuth(), AuthContext, ALLOWED_TYPES, API_BASE_URL, RequestOptions (+2 more)
+### Community 23 - "lucide-react"
+Cohesion: 0.18
+Nodes (11): lucide-react, react-dom, react-router-dom, dependencies, lucide-react@^1.41.0, react@^18.3.1, react-dom@^18.3.1, react-router-dom@^7.18.3 (+3 more)
 
 ### Community 24 - "auth.service.ts"
 Cohesion: 0.26
@@ -268,13 +267,13 @@ Nodes (4): salaryController, router, salaryRepository, salaryService
 Cohesion: 0.20
 Nodes (4): text, tmpFilePath, dir, files
 
-### Community 37 - "IRPFDependents"
-Cohesion: 0.53
-Nodes (5): IRPFDependents(), handleAddDependent(), handleDeleteDependent(), loadDependents(), validateCPF()
+### Community 37 - "react"
+Cohesion: 0.23
+Nodes (7): react, pageMetadata, periodOptions, STORAGE_KEYS, AuthContext, FinancialContext, initialState
 
 ### Community 38 - "Header.jsx"
-Cohesion: 0.24
-Nodes (7): Header(), pageMetadata, periodOptions, STORAGE_KEYS, MainLayout(), formatCurrency(), Sidebar()
+Cohesion: 0.39
+Nodes (4): Header(), MainLayout(), formatCurrency(), Sidebar()
 
 ### Community 39 - "*"
 Cohesion: 0.50
@@ -324,9 +323,9 @@ Nodes (5): accountSchema, categorySchema, historySchema, salarySchema, vehicleEx
 Cohesion: 0.14
 Nodes (9): base64Content, fileContent, fileStats, options, payload, req, checkBackendReady(), ensureBackend() (+1 more)
 
-### Community 63 - "api/src/data/store.ts"
-Cohesion: 0.27
-Nodes (14): DATA_FILE, DEFAULT_CATEGORIES, defaultData(), ensureDataFile(), moduleDir, normalizeData(), normalizeOwnerData(), OwnerData (+6 more)
+### Community 63 - "App.jsx"
+Cohesion: 0.20
+Nodes (13): App(), RequireAuth(), FinancialProvider(), financialReducer(), getAlertDescription(), IRPFAlerts(), loadAlerts(), resolveAlert() (+5 more)
 
 ### Community 64 - "financial-http-isolation.test.ts"
 Cohesion: 0.15
@@ -340,9 +339,9 @@ Nodes (13): Authorization, Bulk import (array of contacts), Campaigns use case, 
 Cohesion: 0.14
 Nodes (13): API operations, Authorization, Common mistakes, Example (`curl`) — template send, Generating template HTML, Handlebars (supported patterns), Overview, Payload shape (+5 more)
 
-### Community 68 - "dependencies"
-Cohesion: 0.33
-Nodes (6): react-dom, dependencies, lucide-react@^1.41.0, react@^18.3.1, react-dom@^18.3.1, react-router-dom@^7.18.3
+### Community 68 - "ref_node_test"
+Cohesion: 0.17
+Nodes (5): db, dbPath, dependentA, dependentB, dataDir
 
 ### Community 69 - "pre-phase-3/src/types.ts"
 Cohesion: 0.38
@@ -377,16 +376,12 @@ Cohesion: 0.17
 Nodes (11): Converting email templates, Inline conversion (no file), Input, Purpose, Rules, Step 1: Detect mode, Step 2: Run the converter script, Step 3: Handle flags (Deep mode) (+3 more)
 
 ### Community 78 - "ref_node_assert"
-Cohesion: 0.15
+Cohesion: 0.20
 Nodes (4): __dirname, api(), assertNoAccess(), idsA
 
-### Community 79 - "csv-import.test.ts"
-Cohesion: 0.35
-Nodes (11): readUserData(), writeUserData(), confirmCsvImport(), deleteImportedTransaction(), ensureCategory(), getMonthKey(), rebuildImportedMonthHistory(), requireUserId() (+3 more)
-
 ### Community 80 - "api/src/index.ts"
-Cohesion: 0.12
-Nodes (11): dotenv, dotenv@^16.4.5, envPath, transporter, apiDirectory, envPath, db, dbPath (+3 more)
+Cohesion: 0.18
+Nodes (6): dotenv, dotenv@^16.4.5, envPath, transporter, apiDirectory, envPath
 
 ### Community 81 - "Authorizing Mailtrap API requests"
 Cohesion: 0.18
@@ -433,16 +428,16 @@ Nodes (4): accountSchema, categorySchema, historySchema, vehicleExpenseSchema
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Arquitetura` connect `Arquitetura` to `TaxIRPFContext.tsx`?**
-  _High betweenness centrality (0.189) - this node is a cross-community bridge._
+  _High betweenness centrality (0.193) - this node is a cross-community bridge._
 - **What connects `eslint:recommended` to the rest of the system?**
   _1 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `apiCall` be split into smaller, more focused modules?**
-  _Cohesion score 0.1425287356321839 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.1455026455026455 - nodes in this community are weakly interconnected._
 - **Why does `requireAuth()` connect `express` to `auth.service.ts`, `Arquitetura`, `api/src/controllers/salary.controller.ts`, `api/src/app.ts`?**
-  _High betweenness centrality (0.185) - this node is a cross-community bridge._
+  _High betweenness centrality (0.189) - this node is a cross-community bridge._
+- **Should `csv-import.service.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.10453283996299723 - nodes in this community are weakly interconnected._
+- **Why does `Backend IRPF — Fase 8.3` connect `Arquitetura` to `express`?**
+  _High betweenness centrality (0.189) - this node is a cross-community bridge._
 - **Should `pre-phase-3/src/app.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.13725490196078433 - nodes in this community are weakly interconnected._
-- **Why does `Backend IRPF — Fase 8.3` connect `Arquitetura` to `express`?**
-  _High betweenness centrality (0.185) - this node is a cross-community bridge._
-- **Should `app/package.json` be split into smaller, more focused modules?**
-  _Cohesion score 0.06538461538461539 - nodes in this community are weakly interconnected._

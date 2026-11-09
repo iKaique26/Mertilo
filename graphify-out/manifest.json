@@ -846,15 +846,15 @@
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/Login.jsx": {
-    "mtime": 1794170930.1177397,
-    "seen": 1794171679.5153303,
-    "ast_hash": "09845e6fe6eeb18feed82321a217c677",
+    "mtime": 1794185751.324133,
+    "seen": 1794188527.3932638,
+    "ast_hash": "b7f5c8037bfeafde70ea9f6a76bec3a3",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/Register.jsx": {
-    "mtime": 1793991258.1560233,
-    "seen": 1793992456.245905,
-    "ast_hash": "df13d677f20189fe32aa3c8442976bd8",
+    "mtime": 1794188484.7723703,
+    "seen": 1794188527.3932667,
+    "ast_hash": "2648aa202d78400a27fb97b0110b82e4",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/ResetPassword.jsx": {
@@ -978,9 +978,9 @@
     "semantic_hash": ""
   },
   "resources/app/index.html": {
-    "mtime": 1787249208.0,
-    "seen": 1792843822.4003341,
-    "ast_hash": "adb62355dd522b5fa9e65e21f340080b",
+    "mtime": 1794177304.2312238,
+    "seen": 1794188527.4023907,
+    "ast_hash": "3dbd299dc1c5008a6f1137fdd53c7ce1",
     "semantic_hash": ""
   },
   "resources/app/node_procs.txt": {
@@ -7335,6 +7335,18 @@
     "mtime": 1794138350.85342,
     "seen": 1794171679.5173395,
     "ast_hash": "3a9b115cd85179861878162b8e7b570e",
+    "semantic_hash": ""
+  },
+  "imagens/transform-the-existing-logo-concept-into-a-classic-icon-only.png": {
+    "mtime": 1794019002.567644,
+    "seen": 1794188527.4027522,
+    "ast_hash": "7eefa3f0a47c72116417396b516324ec",
+    "semantic_hash": ""
+  },
+  "resources/app/src/assets/mirtilo-logo.svg": {
+    "mtime": 1794177304.2312238,
+    "seen": 1794188527.4027548,
+    "ast_hash": "a7c7d5d875d5a0765d2b5b8895e69518",
     "semantic_hash": ""
   }
 }

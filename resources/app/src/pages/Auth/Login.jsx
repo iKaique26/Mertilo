@@ -104,7 +104,7 @@ export default function Login() {
             <div className="login-field">
               <div className="login-field__label-row">
                 <label htmlFor="login-password">Senha</label>
-                <Link to="/forgot-password">Esqueci minha senha</Link>
+                <Link to="/forgot-password" viewTransition>Esqueci minha senha</Link>
               </div>
               <div className="login-field__control">
                 <Lock size={18} aria-hidden="true" />
@@ -140,7 +140,7 @@ export default function Login() {
               {loading ? <span className="login-panel__spinner" aria-hidden="true" /> : 'Entrar na Mertilo'}
             </button>
           </form>
-          <p className="login-panel__signup">Ainda não usa Mertilo? <Link to="/register">Criar conta</Link></p>
+          <p className="login-panel__signup">Ainda não usa Mertilo? <Link to="/register" viewTransition>Criar conta</Link></p>
         </section>
       </div>
     </main>
