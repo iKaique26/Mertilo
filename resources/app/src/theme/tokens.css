@@ -1892,6 +1892,9 @@ textarea::placeholder {
 .login-panel__spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.34); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
 .login-panel__signup { margin: 26px 0 0; color: #94a3b8; font-size: .86rem; text-align: center; }
 
+.login-panel__back-link { display: inline-flex; align-items: center; gap: 8px; color: #a78bfa; text-decoration: none; font-weight: 600; }
+.login-panel__back-link:hover { color: #c4b5fd; text-decoration: underline; }
+
 .login-panel__success { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
 .login-panel__verify-link, .login-panel__login-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px; color: #fff; background: #8b5cf6; border: 1px solid transparent; border-radius: 10px; font: inherit; font-weight: 600; text-decoration: none; transition: background 160ms ease, transform 160ms ease; }
 .login-panel__verify-link:hover, .login-panel__login-link:hover { background: #7c3aed; transform: translateY(-1px); }
