@@ -11,6 +11,7 @@ router.get('/me', requireAuth, (req, res) => authController.me(req, res));
 router.post('/verify-email', authRateLimiter, (req, res) => authController.verifyEmail(req, res));
 router.post('/resend-verification', resendVerificationRateLimiter, (req, res) => authController.resendVerification(req, res));
 router.post('/forgot-password', passwordResetRateLimiter, (req, res) => authController.forgotPassword(req, res));
+router.post('/validate-reset-token', passwordResetRateLimiter, (req, res) => authController.validateResetToken(req, res));
 router.post('/reset-password', passwordResetRateLimiter, (req, res) => authController.resetPassword(req, res));
 router.post('/change-password', requireAuth, (req, res) => authController.changePassword(req, res));
 router.post('/logout', requireAuth, (req, res) => authController.logout(req, res));

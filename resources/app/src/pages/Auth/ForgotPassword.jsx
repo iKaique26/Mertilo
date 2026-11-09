@@ -19,13 +19,19 @@ export default function ForgotPassword() {
 
   const handle = async (e) => {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setMessage('Informe um e-mail válido.');
+      return;
+    }
+    if (loading) return;
     setLoading(true);
     setMessage(null);
     try {
-      await apiCall('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+      await apiCall('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email: normalizedEmail }) });
       setMessage('Se o e-mail estiver cadastrado, você receberá instruções de recuperação.');
     } catch (err) {
-      setMessage(err.message || 'Ocorreu um erro.');
+      setMessage('Não foi possível processar a solicitação. Tente novamente mais tarde.');
     } finally {
       setLoading(false);
     }

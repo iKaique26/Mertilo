@@ -1,17 +1,17 @@
 # Graph Report - Mertilo  (2026-11-08)
 
 ## Corpus Check
-- 1198 files · ~2,923,953 words
+- 1198 files · ~2,924,749 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 242 file(s) not represented in the graph (top: .db-shm 80, .db-wal 80, .pak 56)
 
 ## Summary
-- 1307 nodes · 2539 edges · 91 communities (73 shown, 18 thin omitted)
+- 1307 nodes · 2543 edges · 92 communities (74 shown, 18 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 54 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `237fef76`
+- Built from commit: `e87f0145`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -39,7 +39,7 @@
 - file-processor.ts
 - .eslintrc.json
 - compilerOptions
-- lucide-react
+- dependencies
 - auth.service.ts
 - Dashboard/index.jsx
 - Template Conversion Rules
@@ -86,6 +86,7 @@
 - Converting email templates
 - policy
 - ref_node_assert
+- ImportacaoFinanceira/index.jsx
 - api/src/index.ts
 - Authorizing Mailtrap API requests
 - database/index.ts
@@ -107,7 +108,7 @@
 6. `App()` - 27 edges
 7. `lucide-react` - 24 edges
 8. `logger` - 21 edges
-9. `react-router-dom` - 19 edges
+9. `react-router-dom` - 21 edges
 10. `Dashboard()` - 19 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -125,7 +126,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (91 total, 18 thin omitted)
+## Communities (92 total, 18 thin omitted)
 
 ### Community 0 - "apiCall"
 Cohesion: 0.15
@@ -168,8 +169,8 @@ Cohesion: 0.15
 Nodes (11): accountSchema, categorySchema, historySchema, salarySchema, vehicleExpenseSchema, accountSchema, categorySchema, historySchema (+3 more)
 
 ### Community 11 - "FinancialContext.tsx"
-Cohesion: 0.09
-Nodes (16): formatCurrency(), ImportacaoFinanceira(), previewFallback, financialService, financialImportService, Account, AppData, Category (+8 more)
+Cohesion: 0.14
+Nodes (16): FinancialContext, FinancialProvider(), financialReducer(), initialState, financialService, Account, AppData, Category (+8 more)
 
 ### Community 12 - "converter.py"
 Cohesion: 0.09
@@ -215,9 +216,9 @@ Nodes (14): eslint:recommended, env, browser, es2021, node, extends, parserOptio
 Cohesion: 0.14
 Nodes (13): compilerOptions, esModuleInterop, forceConsistentCasingInFileNames, lib, module, moduleResolution, outDir, rootDir (+5 more)
 
-### Community 23 - "lucide-react"
-Cohesion: 0.18
-Nodes (11): lucide-react, react-dom, react-router-dom, dependencies, lucide-react@^1.41.0, react@^18.3.1, react-dom@^18.3.1, react-router-dom@^7.18.3 (+3 more)
+### Community 23 - "dependencies"
+Cohesion: 0.33
+Nodes (6): react-dom, dependencies, lucide-react@^1.41.0, react@^18.3.1, react-dom@^18.3.1, react-router-dom@^7.18.3
 
 ### Community 24 - "auth.service.ts"
 Cohesion: 0.26
@@ -268,8 +269,8 @@ Cohesion: 0.20
 Nodes (4): text, tmpFilePath, dir, files
 
 ### Community 37 - "react"
-Cohesion: 0.23
-Nodes (7): react, pageMetadata, periodOptions, STORAGE_KEYS, AuthContext, FinancialContext, initialState
+Cohesion: 0.22
+Nodes (9): lucide-react, react, react-router-dom, pageMetadata, periodOptions, STORAGE_KEYS, AuthContext, API_BASE_URL (+1 more)
 
 ### Community 38 - "Header.jsx"
 Cohesion: 0.39
@@ -284,8 +285,8 @@ Cohesion: 0.12
 Nodes (16): From Amazon SES, From Brevo, From Mailgun, From Mandrill, From Postmark, From SendGrid, How to Migrate Email Templates to Mailtrap, Prerequisites (+8 more)
 
 ### Community 53 - "IRPFDocuments"
-Cohesion: 0.23
-Nodes (9): getStatusColor(), IRPFDocuments(), confirmDocument(), handleDelete(), handleDrop(), handleFileUpload(), loadDocuments(), uploadFile() (+1 more)
+Cohesion: 0.21
+Nodes (10): ALLOWED_TYPES, getStatusColor(), IRPFDocuments(), confirmDocument(), handleDelete(), handleDrop(), handleFileUpload(), loadDocuments() (+2 more)
 
 ### Community 54 - "dependencies"
 Cohesion: 0.10
@@ -324,8 +325,8 @@ Cohesion: 0.14
 Nodes (9): base64Content, fileContent, fileStats, options, payload, req, checkBackendReady(), ensureBackend() (+1 more)
 
 ### Community 63 - "App.jsx"
-Cohesion: 0.20
-Nodes (13): App(), RequireAuth(), FinancialProvider(), financialReducer(), getAlertDescription(), IRPFAlerts(), loadAlerts(), resolveAlert() (+5 more)
+Cohesion: 0.24
+Nodes (11): App(), RequireAuth(), getAlertDescription(), IRPFAlerts(), loadAlerts(), resolveAlert(), ForgotPassword(), Login() (+3 more)
 
 ### Community 64 - "financial-http-isolation.test.ts"
 Cohesion: 0.15
@@ -378,6 +379,10 @@ Nodes (11): Converting email templates, Inline conversion (no file), Input, Purp
 ### Community 78 - "ref_node_assert"
 Cohesion: 0.20
 Nodes (4): __dirname, api(), assertNoAccess(), idsA
+
+### Community 79 - "ImportacaoFinanceira/index.jsx"
+Cohesion: 0.22
+Nodes (4): formatCurrency(), ImportacaoFinanceira(), previewFallback, financialImportService
 
 ### Community 80 - "api/src/index.ts"
 Cohesion: 0.18

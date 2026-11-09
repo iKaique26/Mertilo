@@ -366,9 +366,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/controllers/auth.controller.ts": {
-    "mtime": 1794139890.2822187,
-    "seen": 1794171679.5061312,
-    "ast_hash": "b28be12cc195e4e2b08cd48250b094c0",
+    "mtime": 1794191512.3784564,
+    "seen": 1794191578.8811693,
+    "ast_hash": "0e010e26eb625c064b6cea8388627956",
     "semantic_hash": ""
   },
   "resources/app/api/src/controllers/category.controller.ts": {
@@ -426,9 +426,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/database/migrations.ts": {
-    "mtime": 1793993790.0312724,
-    "seen": 1793994182.8985052,
-    "ast_hash": "dee99a84ddf69c4b0d0926a955383017",
+    "mtime": 1794191473.4451451,
+    "seen": 1794191578.8821476,
+    "ast_hash": "d646d102852527ef7b9106eb2db3af84",
     "semantic_hash": ""
   },
   "resources/app/api/src/database/migrations_010_users_meta_investments.ts": {
@@ -516,9 +516,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/repositories/users.repository.ts": {
-    "mtime": 1793995615.0587761,
-    "seen": 1793995929.8106306,
-    "ast_hash": "449daba02a5b40f0fb9db8a850d1c05e",
+    "mtime": 1794191335.8944752,
+    "seen": 1794191578.8874023,
+    "ast_hash": "60c41c43068868cf99659d6d634e9ba3",
     "semantic_hash": ""
   },
   "resources/app/api/src/repositories/vehicle-expense.repository.ts": {
@@ -528,9 +528,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/routes/auth.ts": {
-    "mtime": 1794165887.9901195,
-    "seen": 1794171679.509723,
-    "ast_hash": "d570f3df7a6ea30c9d843e0812ecd1ba",
+    "mtime": 1794191288.3150334,
+    "seen": 1794191578.887569,
+    "ast_hash": "a38cd4f8cff20b217e2be5291762203e",
     "semantic_hash": ""
   },
   "resources/app/api/src/schemas/validation.ts": {
@@ -546,9 +546,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/services/auth.service.ts": {
-    "mtime": 1794142440.169495,
-    "seen": 1794171679.509909,
-    "ast_hash": "ca938de22e043e4ff5bf0f3ab9eb3cc3",
+    "mtime": 1794191304.5590997,
+    "seen": 1794191578.8879247,
+    "ast_hash": "76f960a2d74c6df9f7d263678d9a9016",
     "semantic_hash": ""
   },
   "resources/app/api/src/services/category.service.ts": {
@@ -582,9 +582,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/services/email.service.ts": {
-    "mtime": 1794141689.814157,
-    "seen": 1794171679.510542,
-    "ast_hash": "0e509ed3a0dab1a131316918551348ea",
+    "mtime": 1794191363.0908005,
+    "seen": 1794191578.889091,
+    "ast_hash": "cc70b29bbb5c08f4deac88da136d34c5",
     "semantic_hash": ""
   },
   "resources/app/api/src/services/file-processor.ts": {
@@ -756,9 +756,9 @@
     "semantic_hash": ""
   },
   "resources/app/src/App.jsx": {
-    "mtime": 1793888400.2132926,
-    "seen": 1793930800.196506,
-    "ast_hash": "24d2b70beb8c44043bbb13f105a7a1c0",
+    "mtime": 1794191562.0353458,
+    "seen": 1794191578.8940055,
+    "ast_hash": "cf72566e7cb4123048faba2ec9f6bf76",
     "semantic_hash": ""
   },
   "resources/app/src/components/Auth/RequireAuth.jsx": {
@@ -840,27 +840,27 @@
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/ForgotPassword.jsx": {
-    "mtime": 1789002975.1086516,
-    "seen": 1792843822.4003031,
-    "ast_hash": "222663c5cb7b90189222f079deb6d837",
+    "mtime": 1794191499.4746666,
+    "seen": 1794191578.8981512,
+    "ast_hash": "c8c1318c688387d85e33211f20a28165",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/Login.jsx": {
-    "mtime": 1794185751.324133,
-    "seen": 1794188527.3932638,
-    "ast_hash": "b7f5c8037bfeafde70ea9f6a76bec3a3",
+    "mtime": 1794189028.4790978,
+    "seen": 1794191578.8981552,
+    "ast_hash": "0b575de72c9b2c8f6bde67da2320549c",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/Register.jsx": {
-    "mtime": 1794188484.7723703,
-    "seen": 1794188527.3932667,
-    "ast_hash": "2648aa202d78400a27fb97b0110b82e4",
+    "mtime": 1794189028.4800975,
+    "seen": 1794191578.8981576,
+    "ast_hash": "9cdba9a7b875403db95b9eb1cbbae10e",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/ResetPassword.jsx": {
-    "mtime": 1789002975.1096523,
-    "seen": 1792843822.4003055,
-    "ast_hash": "367172c1037784508b4585dd755aab5a",
+    "mtime": 1794191211.7290728,
+    "seen": 1794191578.89816,
+    "ast_hash": "0d9d2a09694fcd607df659ceb3b1a1ed",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/VerifyEmail.jsx": {

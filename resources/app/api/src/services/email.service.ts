@@ -110,26 +110,54 @@ export function buildVerificationEmail(code: string, expiresInMinutes = 60) {
 export function buildPasswordResetEmail(link: string) {
   const safeLink = escapeHtml(link);
   const text = [
-    'Recuperação de senha — Mertilo',
+    'Redefinição de senha — Mertilo',
     '',
     'Olá!',
     'Recebemos uma solicitação para redefinir sua senha da Mertilo.',
-    'Use o link a seguir para continuar:',
+    'Use o link a seguir para criar uma nova senha:',
     link,
-    'Se você não solicitou, pode ignorar este e-mail.',
+    'Este link expira em 30 minutos e pode ser usado apenas uma vez.',
+    'Se você não solicitou a redefinição, pode ignorar este e-mail.',
     'Atenciosamente,',
     'Equipe Mertilo',
   ].join('\n');
 
   const html = `
-    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
-      <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff;">
-        <h2 style="margin: 0 0 16px; color: #111827;">Recuperação de senha — Mertilo</h2>
-        <p style="margin: 0 0 12px;">Olá! Recebemos uma solicitação para redefinir sua senha da Mertilo.</p>
-        <p style="margin: 0 0 12px;">Use o link a seguir para continuar:</p>
-        <p style="margin: 0 0 16px;"><a href="${safeLink}" style="color: #111827; font-weight: 700; word-break: break-all;">${safeLink}</a></p>
-        <p style="margin: 0 0 12px;">Se você não solicitou a redefinição, pode ignorar este e-mail.</p>
-        <p style="margin: 0; color: #6b7280;">Atenciosamente,<br>Equipe Mertilo</p>
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1f2937; line-height: 1.6;">
+      <div style="max-width: 560px; margin: 0 auto; padding: 40px 32px; border: 1px solid #e5e7eb; border-radius: 16px; background: #ffffff;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 24px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #22d3ee); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+            <span style="font-size: 24px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em;">Mertilo</span>
+          </div>
+        </div>
+        
+        <h2 style="margin: 0 0 16px; color: #0f172a; font-size: 24px; font-weight: 700; text-align: center;">Redefinição de senha</h2>
+        <p style="margin: 0 0 24px; color: #475569; font-size: 16px; text-align: center;">Recebemos uma solicitação para redefinir sua senha da Mertilo.</p>
+        
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${safeLink}" style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #ffffff; font-weight: 600; font-size: 16px; text-decoration: none; border-radius: 10px; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);">
+            Criar nova senha
+          </a>
+        </div>
+        
+        <p style="margin: 0 0 8px; color: #64748b; font-size: 14px; text-align: center;">Ou copie e cole este link no seu navegador:</p>
+        <p style="margin: 0 0 24px; color: #8b5cf6; font-size: 13px; text-align: center; word-break: break-all; font-family: monospace;">${safeLink}</p>
+        
+        <div style="padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <p style="margin: 0 0 8px; color: #475569; font-size: 13px;"><strong>Informações importantes:</strong></p>
+          <ul style="margin: 0; padding-left: 20px; color: #64748b; font-size: 13px;">
+            <li>Este link expira em <strong>30 minutos</strong>.</li>
+            <li>O link pode ser usado <strong>apenas uma vez</strong>.</li>
+            <li>Se você não solicitou esta redefinição, pode ignorar este e-mail com segurança.</li>
+          </ul>
+        </div>
+        
+        <p style="margin: 24px 0 0; color: #94a3b8; font-size: 13px; text-align: center;">Atenciosamente,<br>Equipe Mertilo</p>
       </div>
     </div>
   `;

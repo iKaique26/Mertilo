@@ -76,9 +76,20 @@ export const authController = {
     try {
       const { email } = req.body || {};
       if (typeof email !== 'string') return badRequest(res, 'E-mail é obrigatório');
-      const result = await (await import('../services/auth.service.js')).authService.forgotPassword(email);
-      if (result && (result as any).token) return res.json({ success: true, token: (result as any).token });
+      await (await import('../services/auth.service.js')).authService.forgotPassword(email);
       res.json({ success: true });
+    } catch (err) {
+      console.error('[AUTH] password reset email failed', err instanceof Error ? err.message : err);
+      return res.json({ success: true });
+    }
+  },
+
+  async validateResetToken(req: Request, res: Response) {
+    try {
+      const { token } = req.body || {};
+      if (typeof token !== 'string') return badRequest(res, 'Token é obrigatório');
+      const result = await (await import('../services/auth.service.js')).authService.validateResetToken(token);
+      res.json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro';
       return badRequest(res, message);
@@ -87,9 +98,9 @@ export const authController = {
 
   async resetPassword(req: Request, res: Response) {
     try {
-      const { email, token, newPassword } = req.body || {};
-      if (typeof email !== 'string' || typeof token !== 'string' || typeof newPassword !== 'string') return badRequest(res, 'Dados inválidos');
-      await (await import('../services/auth.service.js')).authService.resetPassword(email, token, newPassword);
+      const { token, newPassword } = req.body || {};
+      if (typeof token !== 'string' || typeof newPassword !== 'string') return badRequest(res, 'Dados inválidos');
+      await (await import('../services/auth.service.js')).authService.resetPassword(token, newPassword);
       res.json({ success: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro';

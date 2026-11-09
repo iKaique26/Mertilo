@@ -192,36 +192,58 @@ export const authService = {
   async forgotPassword(email: string) {
     const user = usersRepository.findByEmail(email);
     if (!user) return true; // don't reveal
-    const token = (await import('crypto')).randomBytes(32).toString('hex');
-    const tokenHash = await bcrypt.hash(token, 10);
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60).toISOString(); // 1h
+    const crypto = await import('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 30).toISOString(); // 30 min
     usersRepository.createPasswordReset(user.id, tokenHash, expiresAt);
-    const resetLink = `https://app.mertilo.local/reset-password?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
+    const resetLink = `https://www.mertiloo.com.br/#/Reset-password/${token}`;
     await emailService.sendPasswordReset(user.email, resetLink);
     // in test env return token to allow automated tests to reset password
     if (process.env.NODE_ENV === 'test') return { token };
     return true;
   },
 
-  async resetPassword(email: string, token: string, newPassword: string) {
-    if (typeof newPassword !== 'string' || newPassword.length < 8) throw new Error('Senha deve ter ao menos 8 caracteres');
-    const user = usersRepository.findByEmail(email);
-    if (!user) throw new Error('Usuário não encontrado');
-    const record = usersRepository.getActivePasswordReset(user.id);
+  async validateResetToken(token: string) {
+    const crypto = await import('crypto');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const record = usersRepository.getPasswordResetByHash(tokenHash);
     if (!record) throw new Error('Token inválido ou expirado');
-    if (record.attempts >= 5) throw new Error('Limite de tentativas excedido');
-    const ok = await bcrypt.compare(token, record.token_hash);
-    if (!ok) {
-      usersRepository.incrementPasswordResetAttempts(record.id);
-      throw new Error('Token inválido');
-    }
-    // update password
-    const password_hash = await bcrypt.hash(newPassword, 10);
+    if (record.used) throw new Error('Token já utilizado');
+    if (new Date(record.expires_at) < new Date()) throw new Error('Token expirado');
+    return { valid: true };
+  },
+
+  async resetPassword(token: string, newPassword: string) {
+    if (typeof newPassword !== 'string' || newPassword.length < 8) throw new Error('Senha deve ter ao menos 8 caracteres');
+    const crypto = await import('crypto');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    
     const db = (await import('../database/db.js')).getDatabase();
-    db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(password_hash, new Date().toISOString(), user.id);
-    usersRepository.invalidateUserSessions(user.id);
-    usersRepository.markPasswordResetUsed(record.id);
-    return true;
+    db.exec('BEGIN TRANSACTION');
+    try {
+      const record = usersRepository.getPasswordResetByHash(tokenHash);
+      if (!record) throw new Error('Token inválido ou expirado');
+      if (record.used) throw new Error('Token já utilizado');
+      if (new Date(record.expires_at) < new Date()) throw new Error('Token expirado');
+      
+      const user = usersRepository.findById(record.user_id);
+      if (!user) throw new Error('Usuário não encontrado');
+      
+      const password_hash = await bcrypt.hash(newPassword, 10);
+      db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(password_hash, new Date().toISOString(), user.id);
+      usersRepository.invalidateUserSessions(user.id);
+      usersRepository.markPasswordResetUsed(record.id);
+      
+      // Invalidate other active reset tokens for this user
+      db.prepare('UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0 AND id != ?').run(user.id, record.id);
+      
+      db.exec('COMMIT');
+      return true;
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
   },
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {

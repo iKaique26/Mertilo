@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getDatabase } from '../database/db.js';
 
 export type User = {
@@ -107,7 +108,7 @@ export const usersRepository = {
   // Password resets
   createPasswordReset(userId: string, tokenHash: string, expiresAt: string) {
     const db = getDatabase();
-    const id = Date.now().toString();
+    const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(`INSERT INTO password_resets (id, user_id, token_hash, expires_at, used, attempts, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)`)
@@ -119,6 +120,13 @@ export const usersRepository = {
     const db = getDatabase();
     const now = new Date().toISOString();
     const row = db.prepare('SELECT * FROM password_resets WHERE user_id = ? AND used = 0 AND expires_at > ? ORDER BY created_at DESC LIMIT 1').get(userId, now) as any;
+    return row || null;
+  },
+
+  getPasswordResetByHash(tokenHash: string) {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    const row = db.prepare('SELECT * FROM password_resets WHERE token_hash = ? AND used = 0 AND expires_at > ? ORDER BY created_at DESC LIMIT 1').get(tokenHash, now) as any;
     return row || null;
   },
 

@@ -323,6 +323,10 @@ const migrations: Record<string, string> = {
     CREATE INDEX IF NOT EXISTS idx_verification_codes_user_id ON verification_codes(user_id);
     CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id);
   `,
+  '011_password_reset_security': `
+    CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets(token_hash);
+    CREATE INDEX IF NOT EXISTS idx_password_resets_user_active ON password_resets(user_id, used, expires_at);
+  `,
 };
 
 const migrationRequirements: Record<string, string[]> = {
