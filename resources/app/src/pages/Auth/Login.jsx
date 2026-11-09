@@ -16,8 +16,7 @@ export default function Login() {
 
   const handleFocus = () => setIsRevealed(true);
   const handleBlur = (e) => {
-    // Only hide if neither email nor password is focused
-    if (!e.currentTarget.form?.querySelector('input:focus')) {
+    if (!e.currentTarget.form?.contains(e.relatedTarget)) {
       setIsRevealed(false);
     }
   };
@@ -42,7 +41,11 @@ export default function Login() {
   return (
     <main className="login-page">
       <div className={`login-page__frame ${isRevealed ? 'login-frame--expanded' : ''}`}>
-        <section className={`login-page__identity ${isRevealed ? 'login-page__identity--revealed' : ''}`} aria-labelledby="login-brand-title">
+        <section
+          className={`login-page__identity ${isRevealed ? 'login-page__identity--revealed' : ''}`}
+          aria-hidden={!isRevealed}
+          aria-labelledby="login-brand-title"
+        >
           <div className="login-page__brand">
             <span className="login-page__logo" aria-hidden="true">
               <img src={logo} alt="Mertilo" className="login-page__logo-img" />
