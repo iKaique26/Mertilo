@@ -489,22 +489,12 @@ function executeMigration(db: Database.Database, migrationName: string): void {
       })
       .join('\n');
 
-    // Executar cada comando SQL separadamente
-    const statements = cleanSql
-      .split(';')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-
+    // Executar migration
     const transaction = db.transaction(() => {
-      for (const statement of statements) {
-        if (migrationName === '014_users_date_of_birth' && statement.toUpperCase().startsWith('ALTER TABLE USERS ADD COLUMN DATE_OF_BIRTH') && columnExists(db, 'users', 'date_of_birth')) continue;
-        try {
-          db.exec(statement);
-        } catch (error) {
-          logger.error(`❌ Erro ao executar statement em ${migrationName}:`, statement.substring(0, 100), error);
-          throw error;
-        }
+      if (migrationName === '014_users_date_of_birth' && columnExists(db, 'users', 'date_of_birth')) {
+        cleanSql = 'CREATE INDEX IF NOT EXISTS idx_users_date_of_birth ON users(date_of_birth);';
       }
+      db.exec(cleanSql);
       db.prepare('INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES (?)').run(migrationName);
     });
 
