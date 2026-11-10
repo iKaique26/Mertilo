@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"import('fs').then(fs => { fs.mkdirSync('dist/shared', { recursive: true }); fs.cpSync('../shared/legal-documents.json', 'dist/shared/legal-documents.json'); })\"",
     "start": "node dist/index.js",
     "dev:ts-node": "ts-node src/index.ts",
     "test": "npm run build && node --test \"dist/__tests__/*.js\""
