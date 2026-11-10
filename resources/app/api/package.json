@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && node -e \"import('fs').then(fs => { fs.mkdirSync('dist/shared', { recursive: true }); fs.cpSync('../shared/legal-documents.json', 'dist/shared/legal-documents.json'); })\"",
+    "build": "tsc && node -e \"import('node:fs').then(({ default: fs }) => import('node:path').then(({ default: path }) => { const source = path.resolve(process.cwd(), '../shared/legal-documents.json'); const target = path.resolve(process.cwd(), 'dist/shared/legal-documents.json'); if (!fs.existsSync(source)) throw new Error('Missing canonical legal document: ' + source); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.copyFileSync(source, target); console.log('Copied ' + source + ' to ' + target); }))\"",
     "start": "node dist/index.js",
     "dev:ts-node": "ts-node src/index.ts",
     "test": "npm run build && node --test \"dist/__tests__/*.js\""
