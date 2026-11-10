@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
 import { usersRepository, type User } from '../repositories/users.repository.js';
 import { emailService } from './email.service.js';
+import { LEGAL_DOCUMENTS, legalDocumentHash } from '../legal-documents.js';
 
 function randomNumericCode(len = 6) {
   const digits = '0123456789';
@@ -30,10 +31,31 @@ function maskEmail(email: string) {
 }
 
 export const authService = {
-  async register(name: string, email: string, password: string) {
+  async register(name: string, email: string, password: string, acceptTerms: boolean, dateOfBirth?: string) {
+    if (acceptTerms !== true) {
+      throw new Error('Você deve aceitar os Termos de Uso e a Política de Privacidade');
+    }
     if (typeof name !== 'string' || !name.trim()) throw new Error('Nome inválido');
     if (typeof email !== 'string' || !email.includes('@')) throw new Error('Email inválido');
     if (typeof password !== 'string' || password.length < 8) throw new Error('Senha deve ter ao menos 8 caracteres');
+    
+    // Validar maioridade (18+)
+    if (!dateOfBirth || typeof dateOfBirth !== 'string') {
+      throw new Error('Data de nascimento é obrigatória');
+    }
+    const birthDate = new Date(dateOfBirth);
+    if (isNaN(birthDate.getTime())) {
+      throw new Error('Data de nascimento inválida');
+    }
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      throw new Error('O cadastro é permitido apenas para maiores de 18 anos');
+    }
 
     const normalizedEmail = email.trim().toLowerCase();
     const safeEmail = maskEmail(normalizedEmail);
@@ -51,11 +73,11 @@ export const authService = {
 
     try {
       if (!previousUser) {
-        user = usersRepository.create({ name: normalizedName, email: normalizedEmail, password_hash, is_verified: false });
+        user = usersRepository.create({ name: normalizedName, email: normalizedEmail, password_hash, is_verified: false, date_of_birth: birthDate.toISOString().split('T')[0] });
       } else {
         const db = (await import('../database/db.js')).getDatabase();
-        db.prepare('UPDATE users SET name = ?, email = ?, password_hash = ?, is_verified = 0, updated_at = ? WHERE id = ?')
-          .run(normalizedName, normalizedEmail, password_hash, new Date().toISOString(), previousUser.id);
+        db.prepare('UPDATE users SET name = ?, email = ?, password_hash = ?, is_verified = 0, updated_at = ?, date_of_birth = ? WHERE id = ?')
+          .run(normalizedName, normalizedEmail, password_hash, new Date().toISOString(), birthDate.toISOString().split('T')[0], previousUser.id);
         const reloadedUser = usersRepository.findById(previousUser.id);
         if (!reloadedUser) throw new Error('Usuário pendente não encontrado');
         user = reloadedUser;
@@ -68,6 +90,21 @@ export const authService = {
       const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
       createdVerificationId = usersRepository.createVerificationCode(user.id, codeHash, expiresAt);
       logger.info('[EMAIL] verification code persisted', { userId: user.id, email: safeEmail, expiresAt });
+
+      // Save legal acceptances
+      const db = (await import('../database/db.js')).getDatabase();
+      const now = new Date().toISOString();
+      const terms = LEGAL_DOCUMENTS.TERMS_OF_USE;
+      const privacy = LEGAL_DOCUMENTS.PRIVACY_NOTICE;
+      
+      db.prepare(`INSERT INTO legal_acceptances (id, user_id, document_type, document_version, accepted_at, acceptance_method, created_at, content_hash, legal_basis, purpose)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(`acc_${Date.now()}_terms`, user.id, terms.type, terms.version, now, 'WEB_REGISTRATION', now, legalDocumentHash(terms), 'CONTRACT', 'ACCOUNT_CREATION');
+      
+      db.prepare(`INSERT INTO legal_acceptances (id, user_id, document_type, document_version, accepted_at, acceptance_method, created_at, content_hash, legal_basis, purpose)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(`acc_${Date.now() + 1}_privacy`, user.id, privacy.type, privacy.version, now, 'WEB_REGISTRATION', now, legalDocumentHash(privacy), 'NOTICE', 'ACCOUNT_CREATION');
+
       logger.info('[EMAIL] email service called', { userId: user.id, email: safeEmail });
       await emailService.sendVerificationCode(user.email, code, 60);
       logger.info('[EMAIL] email service returned', { userId: user.id, email: safeEmail });
@@ -86,6 +123,7 @@ export const authService = {
         db.prepare('UPDATE users SET name = ?, email = ?, password_hash = ?, is_verified = ?, updated_at = ? WHERE id = ?')
           .run(previousSnapshot.name, previousSnapshot.email, previousSnapshot.password_hash, previousSnapshot.is_verified ? 1 : 0, new Date().toISOString(), previousSnapshot.id);
       } else if (user) {
+        db.prepare('DELETE FROM legal_acceptances WHERE user_id = ?').run(user.id);
         db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
         db.prepare('DELETE FROM verification_codes WHERE user_id = ?').run(user.id);
       }
@@ -196,9 +234,14 @@ export const authService = {
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 30).toISOString(); // 30 min
-    usersRepository.createPasswordReset(user.id, tokenHash, expiresAt);
+    const resetId = usersRepository.createPasswordReset(user.id, tokenHash, expiresAt);
     const resetLink = `https://www.mertiloo.com.br/#/Reset-password/${token}`;
-    await emailService.sendPasswordReset(user.email, resetLink);
+    try {
+      await emailService.sendPasswordReset(user.email, resetLink);
+    } catch (error) {
+      usersRepository.revokePasswordReset(resetId);
+      throw error;
+    }
     // in test env return token to allow automated tests to reset password
     if (process.env.NODE_ENV === 'test') return { token };
     return true;
@@ -220,24 +263,22 @@ export const authService = {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     
     const db = (await import('../database/db.js')).getDatabase();
-    db.exec('BEGIN TRANSACTION');
+    const record = usersRepository.getPasswordResetRecordByHash(tokenHash);
+    if (!record) throw new Error('Token inválido ou expirado');
+    if (record.used) throw new Error('Token já utilizado');
+    if (Number.isNaN(new Date(record.expires_at).getTime()) || new Date(record.expires_at) <= new Date()) throw new Error('Token expirado');
+
+    const user = usersRepository.findById(record.user_id);
+    if (!user) throw new Error('Token inválido ou expirado');
+    const password_hash = await bcrypt.hash(newPassword, 10);
+
+    db.exec('BEGIN IMMEDIATE TRANSACTION');
     try {
-      const record = usersRepository.getPasswordResetByHash(tokenHash);
-      if (!record) throw new Error('Token inválido ou expirado');
-      if (record.used) throw new Error('Token já utilizado');
-      if (new Date(record.expires_at) < new Date()) throw new Error('Token expirado');
-      
-      const user = usersRepository.findById(record.user_id);
-      if (!user) throw new Error('Usuário não encontrado');
-      
-      const password_hash = await bcrypt.hash(newPassword, 10);
+      const consumed = usersRepository.consumePasswordReset(record.id, tokenHash, new Date().toISOString());
+      if (consumed !== 1) throw new Error('Token inválido ou já utilizado');
       db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(password_hash, new Date().toISOString(), user.id);
       usersRepository.invalidateUserSessions(user.id);
-      usersRepository.markPasswordResetUsed(record.id);
-      
-      // Invalidate other active reset tokens for this user
       db.prepare('UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0 AND id != ?').run(user.id, record.id);
-      
       db.exec('COMMIT');
       return true;
     } catch (error) {

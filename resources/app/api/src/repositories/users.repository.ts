@@ -7,6 +7,7 @@ export type User = {
   email: string;
   password_hash: string;
   is_verified?: boolean;
+  date_of_birth?: string;
   created_at: string;
 };
 
@@ -17,9 +18,9 @@ export const usersRepository = {
     const now = new Date().toISOString();
     const normalizedEmail = (user.email ?? '').trim().toLowerCase();
 
-    db.prepare(`INSERT INTO users (id, name, email, password_hash, is_verified, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, user.name, normalizedEmail, user.password_hash, user.is_verified ? 1 : 0, now, now);
+    db.prepare(`INSERT INTO users (id, name, email, password_hash, is_verified, date_of_birth, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, user.name, normalizedEmail, user.password_hash, user.is_verified ? 1 : 0, user.date_of_birth ?? null, now, now);
 
     return {
       id,
@@ -27,6 +28,7 @@ export const usersRepository = {
       email: normalizedEmail,
       password_hash: user.password_hash,
       is_verified: user.is_verified ?? false,
+      date_of_birth: user.date_of_birth,
       created_at: now,
     } as User;
   },
@@ -42,6 +44,7 @@ export const usersRepository = {
       email: row.email,
       password_hash: row.password_hash,
       is_verified: Boolean(row.is_verified),
+      date_of_birth: row.date_of_birth,
       created_at: row.created_at,
     } as User;
   },
@@ -128,6 +131,22 @@ export const usersRepository = {
     const now = new Date().toISOString();
     const row = db.prepare('SELECT * FROM password_resets WHERE token_hash = ? AND used = 0 AND expires_at > ? ORDER BY created_at DESC LIMIT 1').get(tokenHash, now) as any;
     return row || null;
+  },
+
+  getPasswordResetRecordByHash(tokenHash: string) {
+    const db = getDatabase();
+    const row = db.prepare('SELECT * FROM password_resets WHERE token_hash = ? ORDER BY created_at DESC LIMIT 1').get(tokenHash) as any;
+    return row || null;
+  },
+
+  consumePasswordReset(id: string, tokenHash: string, now: string) {
+    const db = getDatabase();
+    return db.prepare('UPDATE password_resets SET used = 1 WHERE id = ? AND token_hash = ? AND used = 0 AND expires_at > ?').run(id, tokenHash, now).changes;
+  },
+
+  revokePasswordReset(id: string) {
+    const db = getDatabase();
+    db.prepare('UPDATE password_resets SET used = 1 WHERE id = ? AND used = 0').run(id);
   },
 
   markPasswordResetUsed(id: string) {

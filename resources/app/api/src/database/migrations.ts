@@ -316,6 +316,23 @@ const migrations: Record<string, string> = {
     CREATE INDEX IF NOT EXISTS idx_irpf_validations_exercise_id ON irpf_validations(exercise_id);
     CREATE INDEX IF NOT EXISTS idx_irpf_validations_status ON irpf_validations(status);
   `,
+  '012_lgpd_compliance': `
+    -- Tabela de aceites legais
+    CREATE TABLE IF NOT EXISTS legal_acceptances (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      document_type TEXT NOT NULL,
+      document_version TEXT NOT NULL,
+      accepted_at TEXT NOT NULL,
+      acceptance_method TEXT NOT NULL,
+      actor_user_id TEXT,
+      actor_role TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_legal_acceptances_user_id ON legal_acceptances(user_id);
+  `,
   '010_users_meta_investments': `
    
 
@@ -326,6 +343,32 @@ const migrations: Record<string, string> = {
   '011_password_reset_security': `
     CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets(token_hash);
     CREATE INDEX IF NOT EXISTS idx_password_resets_user_active ON password_resets(user_id, used, expires_at);
+  `,
+  '013_legal_acceptance_integrity': `
+    CREATE TABLE IF NOT EXISTS legal_documents (
+      document_type TEXT NOT NULL,
+      document_version TEXT NOT NULL,
+      content_hash TEXT NOT NULL UNIQUE,
+      published_at TEXT NOT NULL,
+      retired_at TEXT,
+      requires_acceptance INTEGER NOT NULL CHECK (requires_acceptance IN (0, 1)),
+      PRIMARY KEY (document_type, document_version)
+    );
+    INSERT OR IGNORE INTO legal_documents VALUES
+      ('TERMS_OF_USE', '1.0.0', '916e3646d05e2ceae0bb15928b1634f3aa56fc189b3076a75e1cbd7fa43c27d1', '2026-11-09', NULL, 1),
+      ('PRIVACY_NOTICE', '1.0.0', '3ed34943a174a1a9c05fff83ac53488ee62746e4c51fabc342beb4ef078419ab', '2026-11-09', NULL, 0);
+    ALTER TABLE legal_acceptances ADD COLUMN content_hash TEXT;
+    ALTER TABLE legal_acceptances ADD COLUMN legal_basis TEXT;
+    ALTER TABLE legal_acceptances ADD COLUMN purpose TEXT;
+    ALTER TABLE legal_acceptances ADD COLUMN previous_acceptance_id TEXT;
+    UPDATE legal_acceptances SET content_hash = CASE document_type WHEN 'TERMS_OF_USE' THEN '916e3646d05e2ceae0bb15928b1634f3aa56fc189b3076a75e1cbd7fa43c27d1' WHEN 'PRIVACY_NOTICE' THEN '3ed34943a174a1a9c05fff83ac53488ee62746e4c51fabc342beb4ef078419ab' END, legal_basis = CASE document_type WHEN 'TERMS_OF_USE' THEN 'CONTRACT' WHEN 'PRIVACY_NOTICE' THEN 'NOTICE' END WHERE content_hash IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_legal_acceptances_user_document ON legal_acceptances(user_id, document_type, accepted_at DESC);
+    CREATE TRIGGER IF NOT EXISTS legal_acceptances_immutable_update BEFORE UPDATE ON legal_acceptances BEGIN SELECT RAISE(ABORT, 'legal acceptance history is immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS legal_acceptances_immutable_delete BEFORE DELETE ON legal_acceptances BEGIN SELECT RAISE(ABORT, 'legal acceptance history is immutable'); END;
+  `,
+  '014_users_date_of_birth': `
+    ALTER TABLE users ADD COLUMN date_of_birth TEXT;
+    CREATE INDEX IF NOT EXISTS idx_users_date_of_birth ON users(date_of_birth);
   `,
 };
 
@@ -409,6 +452,10 @@ function getExecutedMigrations(db: Database.Database): string[] {
 /**
  * Executar uma migration
  */
+function columnExists(db: Database.Database, tableName: string, columnName: string): boolean {
+  return (db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>).some((column) => column.name === columnName);
+}
+
 function executeMigration(db: Database.Database, migrationName: string): void {
   let sql = migrations[migrationName];
   // If migration slot is a tiny placeholder, attempt to load companion file
@@ -448,19 +495,20 @@ function executeMigration(db: Database.Database, migrationName: string): void {
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
-    for (const statement of statements) {
-      try {
-        db.exec(statement);
-      } catch (error) {
-        logger.error(`❌ Erro ao executar statement em ${migrationName}:`, statement.substring(0, 100), error);
-        throw error;
+    const transaction = db.transaction(() => {
+      for (const statement of statements) {
+        if (migrationName === '014_users_date_of_birth' && statement.toUpperCase().startsWith('ALTER TABLE USERS ADD COLUMN DATE_OF_BIRTH') && columnExists(db, 'users', 'date_of_birth')) continue;
+        try {
+          db.exec(statement);
+        } catch (error) {
+          logger.error(`❌ Erro ao executar statement em ${migrationName}:`, statement.substring(0, 100), error);
+          throw error;
+        }
       }
-    }
+      db.prepare('INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES (?)').run(migrationName);
+    });
 
-    // Registrar a migration como executada
-    db.prepare('INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES (?)').run(
-      migrationName
-    );
+    transaction();
 
     logger.info(`✅ Migration executada: ${migrationName}`);
   } catch (error) {

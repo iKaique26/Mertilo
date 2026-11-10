@@ -483,7 +483,7 @@ test('auth integration full', async (t) => {
   const passwordA = 'Password123!';
 
   // valid register
-  const regA = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'User A', email: emailA, password: passwordA }) });
+  const regA = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'User A', email: emailA, password: passwordA, acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   assert.strictEqual(regA.status, 201);
   const regABody = await regA.json();
   assert.ok(regABody.verification_code, 'expected verification_code for test env');
@@ -506,7 +506,7 @@ test('auth integration full', async (t) => {
 
   // pending email retries should regenerate code without creating a second user
   const pendingEmail = `pending.retry.${Date.now()}@example.com`;
-  const pendingReg = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Pending User', email: pendingEmail.toUpperCase(), password: 'Password123!' }) });
+  const pendingReg = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Pending User', email: pendingEmail.toUpperCase(), password: 'Password123!', acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   assert.strictEqual(pendingReg.status, 201);
   const pendingRegBody = await pendingReg.json();
   assert.ok(pendingRegBody.verification_code);
@@ -516,7 +516,7 @@ test('auth integration full', async (t) => {
   pendingDb.close();
 
   // same pending email should be allowed to retry without permanent lockout
-  const pendingDup = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Pending User Retry', email: pendingEmail, password: 'Password123!' }) });
+  const pendingDup = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Pending User Retry', email: pendingEmail, password: 'Password123!', acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   assert.strictEqual(pendingDup.status, 201);
 
   // 2) Verification scenarios
@@ -532,7 +532,7 @@ test('auth integration full', async (t) => {
   assert.strictEqual(Number(verifiedRow?.is_verified ?? 0), 1, 'verification must persist in SQLite');
   dbAfterVerify.close();
 
-  const verifiedDup = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'User A2', email: emailA, password: 'Password123!' }) });
+  const verifiedDup = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'User A2', email: emailA, password: 'Password123!', acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   assert.strictEqual(verifiedDup.status, 400);
 
   // already used
@@ -541,7 +541,7 @@ test('auth integration full', async (t) => {
 
   // incorrect code
   const emailB = `test+authB_${Date.now()}@example.com`;
-  const regB = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'User B', email: emailB, password: 'Password123!' }) });
+  const regB = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'User B', email: emailB, password: 'Password123!', acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   const regBbody = await regB.json();
   const badCode = await fetch(`http://127.0.0.1:${PORT}/api/auth/verify-email`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailB, code: '000000' }) });
   assert.strictEqual(badCode.status, 400);
@@ -567,7 +567,7 @@ test('auth integration full', async (t) => {
 
   // resend returns code in test env
   const emailC = `test+authC_${Date.now()}@example.com`;
-  const regC = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'User C', email: emailC, password: 'Password123!' }) });
+  const regC = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'User C', email: emailC, password: 'Password123!', acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   const resResend = await fetch(`http://127.0.0.1:${PORT}/api/auth/resend-verification`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailC }) });
   assert.strictEqual(resResend.status, 200);
   const resResendBody = await resResend.json();
@@ -602,20 +602,31 @@ test('auth integration full', async (t) => {
   const forgot = await fetch(`http://127.0.0.1:${PORT}/api/auth/forgot-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailA }) });
   assert.strictEqual(forgot.status, 200);
   const forgotBody = await forgot.json();
-  const resetToken = forgotBody && forgotBody.token;
-  assert.ok(resetToken, 'expected reset token in test env');
+  assert.deepStrictEqual(forgotBody, { success: true }, 'reset token must never be returned by HTTP');
+
+  const crypto = await import('node:crypto');
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const resetHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+  const resetDb = openDb();
+  const resetUser = resetDb.prepare('SELECT id FROM users WHERE lower(email) = ?').get(normalizedEmailA) as { id: string };
+  resetDb.prepare('INSERT INTO password_resets (id, user_id, token_hash, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, 0, 0, ?)')
+    .run(crypto.randomUUID(), resetUser.id, resetHash, new Date(Date.now() + 60_000).toISOString(), new Date().toISOString());
+  const storedReset = resetDb.prepare('SELECT token_hash FROM password_resets WHERE user_id = ? ORDER BY created_at DESC LIMIT 1').get(resetUser.id) as { token_hash: string };
+  assert.strictEqual(storedReset.token_hash, resetHash);
+  assert.notStrictEqual(storedReset.token_hash, resetToken);
+  resetDb.close();
 
   // reset with invalid new password
-  const resetInvalid = await fetch(`http://127.0.0.1:${PORT}/api/auth/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailA, token: resetToken, newPassword: 'short' }) });
+  const resetInvalid = await fetch(`http://127.0.0.1:${PORT}/api/auth/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: resetToken, newPassword: 'short' }) });
   assert.strictEqual(resetInvalid.status, 400);
 
   // reset valid
   const newPass = 'NewPassword123!';
-  const resetOk = await fetch(`http://127.0.0.1:${PORT}/api/auth/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailA, token: resetToken, newPassword: newPass }) });
+  const resetOk = await fetch(`http://127.0.0.1:${PORT}/api/auth/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: resetToken, newPassword: newPass }) });
   assert.strictEqual(resetOk.status, 200);
 
   // token used can't be reused
-  const resetAgain = await fetch(`http://127.0.0.1:${PORT}/api/auth/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailA, token: resetToken, newPassword: 'Another123!' }) });
+  const resetAgain = await fetch(`http://127.0.0.1:${PORT}/api/auth/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: resetToken, newPassword: 'Another123!' }) });
   assert.strictEqual(resetAgain.status, 400);
 
   // login with new password
@@ -641,7 +652,7 @@ test('auth integration full', async (t) => {
   assert.strictEqual(meAfter.status, 401);
 
   // security: password never in responses
-  const regCheck = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Sec', email: `sec_${Date.now()}@example.com`, password: 'Password123!' }) });
+  const regCheck = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Sec', email: `sec_${Date.now()}@example.com`, password: 'Password123!', acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   const regCheckBody = await regCheck.json();
   assert.ok(!regCheckBody.user.password_hash);
 

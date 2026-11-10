@@ -5,11 +5,11 @@ import { badRequest } from '../utils/http.js';
 export const authController = {
   async register(req: Request, res: Response) {
     try {
-      const { name, email, password } = req.body || {};
-      if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      const { name, email, password, acceptTerms, dateOfBirth } = req.body || {};
+      if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string' || typeof dateOfBirth !== 'string') {
         return badRequest(res, 'Dados inválidos para registro');
       }
-      const result = await authService.register(name, email, password);
+      const result = await authService.register(name, email, password, acceptTerms, dateOfBirth);
       res.status(201).json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao registrar usuário';
@@ -75,11 +75,11 @@ export const authController = {
   async forgotPassword(req: Request, res: Response) {
     try {
       const { email } = req.body || {};
-      if (typeof email !== 'string') return badRequest(res, 'E-mail é obrigatório');
+      if (typeof email !== 'string' || email.length > 320) return badRequest(res, 'E-mail é obrigatório');
       await (await import('../services/auth.service.js')).authService.forgotPassword(email);
       res.json({ success: true });
     } catch (err) {
-      console.error('[AUTH] password reset email failed', err instanceof Error ? err.message : err);
+      console.error('[AUTH] password reset delivery failed', { type: err instanceof Error ? err.name : 'unknown' });
       return res.json({ success: true });
     }
   },
@@ -87,7 +87,7 @@ export const authController = {
   async validateResetToken(req: Request, res: Response) {
     try {
       const { token } = req.body || {};
-      if (typeof token !== 'string') return badRequest(res, 'Token é obrigatório');
+      if (typeof token !== 'string' || token.length < 1 || token.length > 128) return badRequest(res, 'Token é obrigatório');
       const result = await (await import('../services/auth.service.js')).authService.validateResetToken(token);
       res.json(result);
     } catch (err) {
@@ -99,7 +99,7 @@ export const authController = {
   async resetPassword(req: Request, res: Response) {
     try {
       const { token, newPassword } = req.body || {};
-      if (typeof token !== 'string' || typeof newPassword !== 'string') return badRequest(res, 'Dados inválidos');
+      if (typeof token !== 'string' || token.length < 1 || token.length > 128 || typeof newPassword !== 'string' || newPassword.length > 1024) return badRequest(res, 'Dados inválidos');
       await (await import('../services/auth.service.js')).authService.resetPassword(token, newPassword);
       res.json({ success: true });
     } catch (err) {

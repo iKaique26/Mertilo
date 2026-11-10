@@ -48,8 +48,10 @@ function isLocalDevelopment() {
 }
 
 function getProviderChain(preferBrevo = false): EmailProvider[] {
-  const preference = getProviderPreference();
-  if (process.env.NODE_ENV === 'test') return [new MockEmailProvider()];
+  const preference = process.env.NODE_ENV === 'test' && !process.env.EMAIL_PROVIDER ? 'mock' : getProviderPreference();
+  if (preference === 'mock' && process.env.NODE_ENV === 'test' && !process.env.MAILTRAP_API_TOKEN && !process.env.BREVO_API_KEY) {
+    return [new MockEmailProvider()];
+  }
   
   const mailtrap = new MailtrapEmailProvider();
   const brevo = new BrevoEmailProvider();
@@ -71,7 +73,6 @@ function getProviderChain(preferBrevo = false): EmailProvider[] {
     return mailtrapReady && brevoReady ? [mailtrap, brevo] : (mailtrapReady ? [mailtrap] : (brevoReady ? [brevo] : [new MockEmailProvider()]));
   }
   
-  // Default fallback order: Mailtrap first, Brevo second if configured
   return mailtrapReady && brevoReady ? [mailtrap, brevo] : (mailtrapReady ? [mailtrap] : (brevoReady ? [brevo] : [new MockEmailProvider()]));
 }
 
@@ -213,7 +214,6 @@ export const emailService = {
     }
 
     const raw = lastError instanceof Error ? lastError.message : 'Erro ao enviar e-mail';
-    throw new Error(`Não foi possível enviar o e-mail no momento. Motivo do provedor: ${raw}`);
     throw new Error(`Não foi possível enviar o e-mail no momento. Motivo do provedor: ${raw}`);
   },
 
