@@ -1,0 +1,29 @@
+{
+  "terms": {
+    "type": "TERMS_OF_USE",
+    "version": "1.1.0",
+    "publishedAt": "2026-11-09",
+    "title": "Termos de Uso",
+    "content": [
+      { "heading": "1. Aceitação e elegibilidade", "paragraphs": ["O Mertilo é um serviço de organização financeira pessoal e apoio à preparação de informações para IRPF, operado inicialmente por pessoa física sob a identidade comercial Mertilo. O serviço destina-se exclusivamente a pessoas com 18 anos ou mais. A declaração de nascimento não constitui verificação independente de identidade."] },
+      { "heading": "2. Limites do serviço", "paragraphs": ["O Mertilo não é banco, instituição financeira, escritório contábil ou escritório de advocacia. Informações e ferramentas não substituem orientação profissional nem garantem resultados financeiros ou fiscais."] },
+      { "heading": "3. Responsabilidades", "paragraphs": ["O usuário deve fornecer dados corretos, proteger suas credenciais e possuir autorização para importar dados e documentos. O usuário deve revisar informações fiscais antes de utilizá-las ou transmiti-las."] },
+      { "heading": "4. Disponibilidade e encerramento", "paragraphs": ["O serviço é inicialmente gratuito. Recursos podem passar por manutenção, alteração ou suspensão por motivos operacionais ou de segurança, observados direitos e obrigações legais. O encerramento da conta pode estar sujeito a retenções legalmente exigidas."] },
+      { "heading": "5. Operação", "paragraphs": ["A identificação nominal do operador/controlador e canal funcional para contato permanecem pendentes de confirmação. Estes termos não excluem responsabilidades previstas em lei."] }
+    ]
+  },
+  "privacy": {
+    "type": "PRIVACY_NOTICE",
+    "version": "1.1.0",
+    "publishedAt": "2026-11-09",
+    "title": "Política de Privacidade",
+    "content": [
+      { "heading": "1. Controlador e contato", "paragraphs": ["Mertilo é a identidade comercial de projeto inicialmente operado por pessoa física, sem CNPJ. A identificação nominal do controlador e a confirmação de funcionamento de privacidade@mertiloo.com.br são pendências que impedem publicação final desta política."] },
+      { "heading": "2. Dados e finalidades", "paragraphs": ["O serviço pode tratar nome, e-mail e senha protegida por hash para cadastro, autenticação e segurança; dados de contas, transações e extratos importados para organização financeira; e documentos e informações fornecidos para recursos de IRPF. Dados financeiros não são automaticamente dados pessoais sensíveis na definição legal."] },
+      { "heading": "3. Bases e comunicações", "paragraphs": ["Os tratamentos dependem de finalidade e base legal aplicável, incluindo execução de serviço solicitado, cumprimento de obrigação legal e proteção da conta. Termos e ciência desta política não constituem consentimento genérico. E-mails operacionais e de segurança podem ser enviados; marketing permanece desativado. Analytics e rastreadores não essenciais não estão habilitados nesta política."] },
+      { "heading": "4. Fornecedores, armazenamento e retenção", "paragraphs": ["Dados podem ser processados pelos fornecedores efetivamente usados para hospedagem, armazenamento, envio operacional de e-mail e processamento de documentos. A lista, locais de processamento e transferências internacionais precisam ser confirmados antes da publicação final. A retenção considera necessidade operacional e obrigações legais; solicitações de eliminação podem ter limitações legais."] },
+      { "heading": "5. Direitos e segurança", "paragraphs": ["O titular pode solicitar confirmação, acesso, correção, anonimização, bloqueio, eliminação quando cabível, portabilidade conforme regulamentação, informações sobre compartilhamento e revogação de consentimento quando aplicável. Solicitações podem ser registradas na área autenticada do serviço. Medidas técnicas de segurança são aplicadas, sem promessa de criptografia universal."] },
+      { "heading": "6. Público", "paragraphs": ["O serviço destina-se exclusivamente a maiores de 18 anos. A data informada no cadastro não é verificação independente de identidade; contas existentes sem data confirmada podem ter recursos protegidos limitados até conclusão de revisão."] }
+    ]
+  }
+}

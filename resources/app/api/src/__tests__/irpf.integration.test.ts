@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const PORT = process.env.TEST_PORT || '6002';
 const BASE = `http://127.0.0.1:${PORT}/api/irpf`;
 let serverProc: any = null;
+let tempDir: string | null = null;
 const BASE_YEAR = 2000 + (Date.now() % 1000);
 let authToken: string | null = null;
 
@@ -35,8 +38,9 @@ async function api(path: string, opts: any = {}) {
 }
 
 test('setup: start server', async (t) => {
-  const testDb = path.join(process.cwd(), 'data', `mertilo.test.${Date.now()}.db`);
-  serverProc = spawn(process.execPath, ['dist/index.js'], { env: { ...process.env, PORT, MERTILO_DB_PATH: testDb, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mertilo-irpf-int-'));
+  const testDb = path.join(tempDir, 'mertilo.test.db');
+  serverProc = spawn(process.execPath, ['dist/index.js'], { env: { ...process.env, PORT, MERTILO_DB_PATH: testDb, MERTILO_DATA_DIR: tempDir, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
   // forward logs to test output
   serverProc.stdout?.on('data', (d: any) => process.stdout.write(`[server] ${d}`));
   serverProc.stderr?.on('data', (d: any) => process.stderr.write(`[server-err] ${d}`));
@@ -45,7 +49,7 @@ test('setup: start server', async (t) => {
   // register and login a default test user for these integration tests
   const email = `test+irpf_${Date.now()}@example.com`;
   const password = 'Password123!';
-  const regRes = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'IRPF Test', email, password }) });
+  const regRes = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'IRPF Test', email, password, acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   let verificationCode: string | undefined;
   if (regRes.status === 201) {
     try {
@@ -277,8 +281,15 @@ test('20 - validations and corrections isolated by exercise', async () => {
 
 // teardown
 test('teardown: stop server', async () => {
-  if (serverProc) {
-    serverProc.kill();
-    serverProc = null;
+  const proc = serverProc;
+  serverProc = null;
+  if (proc && proc.exitCode === null) {
+    await new Promise<void>((resolve) => {
+      proc.once('exit', () => resolve());
+      proc.kill();
+      setTimeout(resolve, 5000).unref();
+    });
   }
+  if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  tempDir = null;
 });

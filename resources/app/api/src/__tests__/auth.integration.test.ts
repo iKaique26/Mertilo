@@ -3,6 +3,8 @@ import assert from 'node:assert';
 import { spawn, execSync } from 'child_process';
 import path from 'path';
 import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import os from 'node:os';
 import nodemailer from 'nodemailer';
 import { MailtrapEmailProvider, MockEmailProvider } from '../services/email-provider.js';
 
@@ -11,6 +13,11 @@ const PORT = process.env.TEST_PORT || String(DEFAULT_PORT);
 const BASE_API = `http://127.0.0.1:${PORT}/api`;
 let serverProc: any = null;
 let dbPath: string;
+let tempDir: string | null = null;
+
+function removeTempDir(dir: string | null) {
+  if (dir) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+}
 
 async function waitForServer(timeout = 10000) {
   const start = Date.now();
@@ -41,6 +48,29 @@ function openDb() {
 function clearTestPort() {
   // Avoid port collisions by choosing a random test port at startup; this keeps the auth suite isolated from prior runs.
   return;
+}
+
+async function stopServerProcess() {
+  const processToStop = serverProc;
+  serverProc = null;
+  if (!processToStop || processToStop.exitCode !== null) return;
+
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      processToStop.stdout?.removeAllListeners();
+      processToStop.stderr?.removeAllListeners();
+      processToStop.removeAllListeners();
+      resolve();
+    };
+    processToStop.once('exit', finish);
+    processToStop.once('close', finish);
+    processToStop.once('error', finish);
+    if (!processToStop.kill()) finish();
+    setTimeout(finish, 5000).unref();
+  });
 }
 
 test('mailtrap provider uses TLS-validated relay when configured', async () => {
@@ -107,21 +137,36 @@ test('register rolls back when email delivery fails and returns a generic error'
   const { initializeDatabase, shutdownDatabase } = await import('../database/index.js');
   const { getDatabase } = await import('../database/db.js');
   const { emailService } = await import('../services/email.service.js');
-  const originalSendVerificationCode = emailService.sendVerificationCode;
+  const originalSendMail = emailService.sendMail;
   const originalEmailProvider = process.env.EMAIL_PROVIDER;
   const originalDbPath = process.env.MERTILO_DB_PATH;
+  const originalMailtrapApiToken = process.env.MAILTRAP_API_TOKEN;
+  const originalMailtrapFromEmail = process.env.MAILTRAP_FROM_EMAIL;
+  const originalMailtrapHost = process.env.MAILTRAP_HOST;
+  const originalMailtrapUser = process.env.MAILTRAP_USER;
+  const originalMailtrapPass = process.env.MAILTRAP_PASS;
+  const originalMailtrapFrom = process.env.MAILTRAP_FROM;
+  const originalBrevoApiKey = process.env.BREVO_API_KEY;
+  const rollbackDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mertilo-auth-rollback-'));
 
-  process.env.EMAIL_PROVIDER = 'auto';
-  process.env.MERTILO_DB_PATH = path.join(process.cwd(), 'data', `mertilo.rollback.test.${Date.now()}.db`);
+  process.env.EMAIL_PROVIDER = 'mock';
+  delete process.env.MAILTRAP_API_TOKEN;
+  delete process.env.MAILTRAP_FROM_EMAIL;
+  delete process.env.MAILTRAP_HOST;
+  delete process.env.MAILTRAP_USER;
+  delete process.env.MAILTRAP_PASS;
+  delete process.env.MAILTRAP_FROM;
+  delete process.env.BREVO_API_KEY;
+  process.env.MERTILO_DB_PATH = path.join(rollbackDir, 'mertilo.rollback.test.db');
   await initializeDatabase();
-  emailService.sendVerificationCode = async () => {
+  emailService.sendMail = async () => {
     throw new Error('Falha no envio pela API Brevo: Key not found');
   };
 
   try {
     const email = `rollback.${Date.now()}@example.com`;
     await assert.rejects(
-      () => authService.register('Rollback User', email, 'Password123!'),
+      () => authService.register('Rollback User', email, 'Password123!', true, '1990-01-01'),
       /Falha no envio|Key not found/i,
     );
 
@@ -131,11 +176,21 @@ test('register rolls back when email delivery fails and returns a generic error'
 
     const verificationRows = db.prepare('SELECT COUNT(*) as c FROM verification_codes').get() as { c?: number };
     assert.strictEqual(Number(verificationRows?.c ?? 0), 0);
+    const acceptanceRows = db.prepare('SELECT COUNT(*) as c FROM legal_acceptances').get() as { c?: number };
+    assert.strictEqual(Number(acceptanceRows?.c ?? 0), 0);
   } finally {
-    emailService.sendVerificationCode = originalSendVerificationCode;
+    emailService.sendMail = originalSendMail;
     await shutdownDatabase();
+    removeTempDir(rollbackDir);
     if (originalEmailProvider === undefined) delete process.env.EMAIL_PROVIDER; else process.env.EMAIL_PROVIDER = originalEmailProvider;
     if (originalDbPath === undefined) delete process.env.MERTILO_DB_PATH; else process.env.MERTILO_DB_PATH = originalDbPath;
+    if (originalMailtrapApiToken === undefined) delete process.env.MAILTRAP_API_TOKEN; else process.env.MAILTRAP_API_TOKEN = originalMailtrapApiToken;
+    if (originalMailtrapFromEmail === undefined) delete process.env.MAILTRAP_FROM_EMAIL; else process.env.MAILTRAP_FROM_EMAIL = originalMailtrapFromEmail;
+    if (originalMailtrapHost === undefined) delete process.env.MAILTRAP_HOST; else process.env.MAILTRAP_HOST = originalMailtrapHost;
+    if (originalMailtrapUser === undefined) delete process.env.MAILTRAP_USER; else process.env.MAILTRAP_USER = originalMailtrapUser;
+    if (originalMailtrapPass === undefined) delete process.env.MAILTRAP_PASS; else process.env.MAILTRAP_PASS = originalMailtrapPass;
+    if (originalMailtrapFrom === undefined) delete process.env.MAILTRAP_FROM; else process.env.MAILTRAP_FROM = originalMailtrapFrom;
+    if (originalBrevoApiKey === undefined) delete process.env.BREVO_API_KEY; else process.env.BREVO_API_KEY = originalBrevoApiKey;
   }
 });
 
@@ -469,9 +524,12 @@ test.skip('legacy SMTP rejection reason behavior', async () => {
 });
 
 test('auth integration full', async (t) => {
-  dbPath = path.join(process.cwd(), 'data', `mertilo.auth.full.test.${Date.now()}.db`);
+  t.after(async () => { await stopServerProcess(); removeTempDir(tempDir); tempDir = null; });
+  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mertilo-auth-full-'));
+  dbPath = path.join(tempDir, 'mertilo.auth.full.test.db');
   clearTestPort();
-  serverProc = spawn(process.execPath, ['dist/index.js'], { env: { ...process.env, PORT, MERTILO_DB_PATH: dbPath, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const serverEntry = path.resolve(import.meta.dirname, '..', 'index.js');
+  serverProc = spawn(process.execPath, [serverEntry], { cwd: path.resolve(import.meta.dirname, '..'), env: { ...process.env, PORT, MERTILO_DB_PATH: dbPath, MERTILO_DATA_DIR: tempDir, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
   serverProc.stdout?.on('data', (d: any) => process.stdout.write(`[server] ${d}`));
   serverProc.stderr?.on('data', (d: any) => process.stderr.write(`[server-err] ${d}`));
 
@@ -555,6 +613,11 @@ test('auth integration full', async (t) => {
   assert.strictEqual(expired.status, 400);
 
   // attempts exceeded
+  // O reenvio imediato após o cadastro deve respeitar a janela mínima de 60s (contrato real, sem bypass em NODE_ENV=test)
+  const resendTooSoon = await fetch(`http://127.0.0.1:${PORT}/api/auth/resend-verification`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailB }) });
+  assert.strictEqual(resendTooSoon.status, 400);
+  // Envelhecer o código (created_at) para além da janela e então reenviar
+  verificationDb.prepare('UPDATE verification_codes SET created_at = ? WHERE id = ?').run(new Date(Date.now() - 1000 * 61 * 2).toISOString(), vb.id);
   // create new code for B via resend and then set attempts
   const resendRes = await fetch(`http://127.0.0.1:${PORT}/api/auth/resend-verification`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailB }) });
   assert.strictEqual(resendRes.status, 200);
@@ -568,14 +631,23 @@ test('auth integration full', async (t) => {
   // resend returns code in test env
   const emailC = `test+authC_${Date.now()}@example.com`;
   const regC = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'User C', email: emailC, password: 'Password123!', acceptTerms: true, dateOfBirth: '1990-01-01' }) });
+  const ageDb = openDb();
+  ageDb.prepare('UPDATE verification_codes SET created_at = ? WHERE user_id = (SELECT id FROM users WHERE lower(email) = ?)').run(new Date(Date.now() - 1000 * 61 * 2).toISOString(), emailC.trim().toLowerCase());
+  ageDb.close();
   const resResend = await fetch(`http://127.0.0.1:${PORT}/api/auth/resend-verification`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailC }) });
   assert.strictEqual(resResend.status, 200);
   const resResendBody = await resResend.json();
   assert.ok(resResendBody.code || true);
 
   // 3) Login
+  const loginRequest = (payload: any, ip: string) => fetch(`http://127.0.0.1:${PORT}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
+    body: JSON.stringify(payload),
+  });
+
   // user A should login
-  const loginA = await fetch(`http://127.0.0.1:${PORT}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailA, password: passwordA }) });
+  const loginA = await loginRequest({ email: emailA, password: passwordA }, '203.0.113.10');
   assert.strictEqual(loginA.status, 200);
   const loginABody = await loginA.json();
   assert.ok(loginABody.token);
@@ -583,19 +655,19 @@ test('auth integration full', async (t) => {
   assert.ok(!loginABody.user.password_hash, 'password_hash should not be returned');
 
   // wrong password
-  const loginWrong = await fetch(`http://127.0.0.1:${PORT}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailA, password: 'wrongpass' }) });
-  assert.strictEqual(loginWrong.status, 400);
+  const loginWrong = await loginRequest({ email: emailA, password: 'wrongpass' }, '203.0.113.11');
+  assert.strictEqual(loginWrong.status, 401);
 
   // non-existent
-  const loginNon = await fetch(`http://127.0.0.1:${PORT}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'noone@example.com', password: 'Password123!' }) });
-  assert.strictEqual(loginNon.status, 400);
+  const loginNon = await loginRequest({ email: 'noone@example.com', password: 'Password123!' }, '203.0.113.12');
+  assert.strictEqual(loginNon.status, 401);
 
   // not verified login (emailB was not verified)
-  const loginB = await fetch(`http://127.0.0.1:${PORT}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailB, password: 'Password123!' }) });
-  assert.strictEqual(loginB.status, 400);
+  const loginB = await loginRequest({ email: emailB, password: 'Password123!' }, '203.0.113.13');
+  assert.strictEqual(loginB.status, 403);
 
   // payload invalid
-  const loginInvalid = await fetch(`http://127.0.0.1:${PORT}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailA }) });
+  const loginInvalid = await loginRequest({ email: emailA }, '203.0.113.14');
   assert.strictEqual(loginInvalid.status, 400);
 
   // 4) Forgot / Reset password
@@ -630,7 +702,7 @@ test('auth integration full', async (t) => {
   assert.strictEqual(resetAgain.status, 400);
 
   // login with new password
-  const loginNew = await fetch(`http://127.0.0.1:${PORT}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailA, password: newPass }) });
+  const loginNew = await loginRequest({ email: emailA, password: newPass }, '203.0.113.15');
   assert.strictEqual(loginNew.status, 200);
   const loginNewBody = await loginNew.json();
   const tokenA = loginNewBody.token;
@@ -656,6 +728,5 @@ test('auth integration full', async (t) => {
   const regCheckBody = await regCheck.json();
   assert.ok(!regCheckBody.user.password_hash);
 
-  // cleanup
-  serverProc.kill();
+  // cleanup handled by t.after so assertion failures cannot leak child servers.
 });

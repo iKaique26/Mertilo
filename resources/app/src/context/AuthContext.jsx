@@ -33,8 +33,8 @@ export function AuthProvider({ children }) {
     return res;
   };
 
-  const register = async (name, email, password) => {
-    const res = await apiCall('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password }) });
+  const register = async (name, email, password, acceptTerms, dateOfBirth) => {
+    const res = await apiCall('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password, acceptTerms, dateOfBirth }) });
     return res;
   };
 

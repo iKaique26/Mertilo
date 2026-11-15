@@ -30,17 +30,22 @@ export function getDatabasePath(): string {
  * Instância única de conexão
  */
 let dbInstance: Database.Database | null = null;
+let dbInstancePath: string | null = null;
 
 /**
  * Obter instância de database
  */
 export function getDatabase(): Database.Database {
+  const dbPath = getDatabasePath();
+
+  if (dbInstance && dbInstancePath !== dbPath) {
+    closeDatabase();
+  }
+
   if (dbInstance) {
     return dbInstance;
   }
 
-  const dbPath = getDatabasePath();
-  
   // Garantir que o diretório existe
   const dbDir = path.dirname(dbPath);
   if (!fs.existsSync(dbDir)) {
@@ -49,6 +54,7 @@ export function getDatabase(): Database.Database {
 
   try {
     dbInstance = new Database(dbPath);
+    dbInstancePath = dbPath;
     
     // Habilitar foreign keys e configurações de segurança
     dbInstance.pragma('foreign_keys = ON');
@@ -71,6 +77,7 @@ export function closeDatabase(): void {
     try {
       dbInstance.close();
       dbInstance = null;
+      dbInstancePath = null;
       logger.info('Database desconectado');
     } catch (error) {
       logger.error('Erro ao desconectar database:', error);

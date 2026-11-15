@@ -29,12 +29,25 @@ if (envPath) {
 }
 
 const { default: app } = await import('./app.js');
-const { initializeDatabase } = await import('./database/index.js');
+const { initializeDatabase, shutdownDatabase } = await import('./database/index.js');
 const { getDatabase } = await import('./database/db.js');
 const { logger } = await import('./utils/logger.js');
 const { emailService } = await import('./services/email.service.js');
 
 const port = Number(process.env.PORT) || 5000;
+let server: ReturnType<typeof app.listen> | null = null;
+let shuttingDown = false;
+
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info(`⚠ Encerrando servidor por ${signal}`);
+  await new Promise<void>((resolve) => {
+    if (!server) return resolve();
+    server.close(() => resolve());
+  });
+  await shutdownDatabase();
+}
 
 async function start() {
   try {
@@ -44,10 +57,12 @@ async function start() {
     const db = getDatabase();
     app.set('db', db);
 
-    app.listen(port, '0.0.0.0', () => {
-      logger.info(`✅ Servidor rodando na porta ${port}`);
+    server = app.listen(port, '0.0.0.0', () => {
+      logger.info(`✓ Servidor rodando na porta ${port}`);
       logger.info(`📚 Documentação: http://localhost:${port}/api-docs`);
     });
+    process.once('SIGTERM', () => { void shutdown('SIGTERM'); });
+    process.once('SIGINT', () => { void shutdown('SIGINT'); });
   } catch (error) {
     logger.error('❌ Erro ao iniciar aplicação:', error);
     process.exit(1);

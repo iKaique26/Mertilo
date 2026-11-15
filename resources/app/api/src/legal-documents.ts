@@ -29,7 +29,7 @@ let cachedDocuments: LegalDocumentsContainer | null = null;
 
 function loadLegalDocuments(): LegalDocumentsContainer {
   if (cachedDocuments) return cachedDocuments;
-  const filePath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../shared/legal-documents.json');
+  const filePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'shared/legal-documents.json');
   
   if (!fs.existsSync(filePath)) {
     logger.error(`Arquivo legal-documents.json não encontrado em ${filePath}`);

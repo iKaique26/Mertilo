@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger.js';
 import { usersRepository, type User } from '../repositories/users.repository.js';
 import { emailService } from './email.service.js';
@@ -22,6 +23,70 @@ const VERIFICATION_TTL_MS = 1000 * 60 * 60;
 const VERIFICATION_MAX_ATTEMPTS = 5;
 const VERIFICATION_RETRY_INTERVAL_MS = 60 * 1000;
 const VERIFICATION_RETRY_MAX_PER_WINDOW = 3;
+
+/**
+ * Mutex em memória por usuário para o reenvio de verificação.
+ *
+ * `better-sqlite3` é síncrono, mas `resendVerification` contém `await bcrypt.hash(...)`,
+ * que cede o event loop. Sem serialização, duas chamadas concorrentes no MESMO processo
+ * podem tentar abrir transações simultâneas na mesma conexão e ambas lerem o estado antes
+ * da escrita — a race condition real.
+ *
+ * Mantemos o bloqueio por usuário para reduzir contenção e evitar que usuários diferentes
+ * fiquem presos em uma fila global. `BEGIN IMMEDIATE` segue sendo a proteção principal para
+ * SQLite multi-processo; o mutex complementa isso dentro do próprio processo.
+ */
+const _resendVerificationMutexes = new Map<string, Promise<unknown>>();
+let _databaseWriteQueue: Promise<unknown> = Promise.resolve();
+
+function withResendMutex<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  const previous = _resendVerificationMutexes.get(userId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  _resendVerificationMutexes.set(userId, previous.then(() => current, () => current));
+
+  return previous
+    .catch(() => undefined)
+    .then(() => fn())
+    .finally(() => {
+      release();
+      if (_resendVerificationMutexes.get(userId) === current) {
+        _resendVerificationMutexes.delete(userId);
+      }
+    });
+}
+
+function withDatabaseWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = _databaseWriteQueue;
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  _databaseWriteQueue = previous.then(() => current, () => current);
+
+  return previous
+    .catch(() => undefined)
+    .then(() => fn())
+    .finally(() => {
+      release();
+      if (_databaseWriteQueue === current) {
+        _databaseWriteQueue = Promise.resolve();
+      }
+    });
+}
+
+/**
+ * Emite o JWT da sessão com `jti` único. Sem ele, dois tokens do mesmo usuário emitidos no
+ * mesmo segundo (mesmos `sub`/`iat`/`exp`) são idênticos, e uma sessão nova "ressuscita" o
+ * token anterior já invalidado (ex.: login logo após redefinição de senha).
+ */
+function signSessionToken(userId: string) {
+  return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: JWT_EXP, jwtid: randomUUID() });
+}
 
 function maskEmail(email: string) {
   const [local, domain] = email.split('@');
@@ -70,6 +135,8 @@ export const authService = {
 
     let user: User | null = null;
     let createdVerificationId: string | null = null;
+    const db = (await import('../database/db.js')).getDatabase();
+    db.exec('BEGIN');
 
     try {
       if (!previousUser) {
@@ -108,26 +175,13 @@ export const authService = {
       logger.info('[EMAIL] email service called', { userId: user.id, email: safeEmail });
       await emailService.sendVerificationCode(user.email, code, 60);
       logger.info('[EMAIL] email service returned', { userId: user.id, email: safeEmail });
+      db.exec('COMMIT');
 
       const result: any = { user: { id: user.id, name: user.name, email: user.email, is_verified: false } };
       if (process.env.NODE_ENV === 'test') result.verification_code = code;
       return result;
     } catch (error) {
-      const db = (await import('../database/db.js')).getDatabase();
-
-      if (createdVerificationId) {
-        db.prepare('DELETE FROM verification_codes WHERE id = ?').run(createdVerificationId);
-      }
-
-      if (previousUser && previousSnapshot) {
-        db.prepare('UPDATE users SET name = ?, email = ?, password_hash = ?, is_verified = ?, updated_at = ? WHERE id = ?')
-          .run(previousSnapshot.name, previousSnapshot.email, previousSnapshot.password_hash, previousSnapshot.is_verified ? 1 : 0, new Date().toISOString(), previousSnapshot.id);
-      } else if (user) {
-        db.prepare('DELETE FROM legal_acceptances WHERE user_id = ?').run(user.id);
-        db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
-        db.prepare('DELETE FROM verification_codes WHERE user_id = ?').run(user.id);
-      }
-
+      if (db.inTransaction) db.exec('ROLLBACK');
       throw error;
     }
   },
@@ -138,7 +192,7 @@ export const authService = {
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) throw new Error('Usuário ou senha inválidos');
     if (!user.is_verified) throw new Error('Conta não verificada');
-    const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: JWT_EXP });
+    const token = signSessionToken(user.id);
     // persist session
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
     usersRepository.createSession(user.id, token, expiresAt);
@@ -163,7 +217,7 @@ export const authService = {
     const verifiedUser = usersRepository.findById(user.id);
     if (!verifiedUser) throw new Error('Usuário não encontrado após verificação');
 
-    const token = jwt.sign({ sub: verifiedUser.id }, JWT_SECRET, { expiresIn: JWT_EXP });
+    const token = signSessionToken(verifiedUser.id);
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
     usersRepository.createSession(verifiedUser.id, token, expiresAt);
 
@@ -184,47 +238,59 @@ export const authService = {
     if (user.is_verified) throw new Error('Conta já verificada');
 
     let preferBrevo = false;
-    if (process.env.NODE_ENV !== 'test') {
-      const latest = usersRepository.getLatestVerificationCode(user.id);
-      if (latest && Date.now() - new Date(latest.created_at).getTime() < VERIFICATION_RETRY_INTERVAL_MS) {
-        throw new Error('Aguarde um momento antes de solicitar outro código.');
-      }
+    let code: string;
 
-      const db = (await import('../database/db.js')).getDatabase();
-      const windowStart = new Date(Date.now() - 1000 * 60 * 60).toISOString();
-      const recentRow = db.prepare('SELECT COUNT(*) as c FROM verification_codes WHERE user_id = ? AND created_at > ?').get(user.id, windowStart) as { c?: number } | undefined;
-      const recentCount = Number(recentRow?.c ?? 0);
-      if (recentCount >= VERIFICATION_RETRY_MAX_PER_WINDOW) {
-        throw new Error('Muitas tentativas de reenvio. Tente novamente mais tarde.');
-      }
-
-      // Check if there are previous verification codes *created before this request window*, meaning a prior resend attempt exists
-      const priorCountRow = db.prepare('SELECT COUNT(*) as c FROM verification_codes WHERE user_id = ? AND used = 1').get(user.id) as { c?: number } | undefined;
-      const priorCount = Number(priorCountRow?.c ?? 0);
-      if (priorCount > 0) {
-        preferBrevo = true;
-        logger.info('[EMAIL] Segundo clique (ou posterior) detectado para reenvio de verificação. Priorizando Brevo.', { userId: user.id, priorCount });
-      }
-    }
-
-    // Use a transaction to ensure atomicity of invalidation and creation
+    // Serialização: mutex in-process + BEGIN IMMEDIATE (cross-process).
+    // As verificações E a criação ficam no mesmo bloco crítico.
     const db = (await import('../database/db.js')).getDatabase();
-    db.exec('BEGIN TRANSACTION');
+    ({ code, preferBrevo } = await withResendMutex(user.id, async () => {
+      return await withDatabaseWriteLock(async () => {
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          const latest = usersRepository.getLatestVerificationCode(user.id);
+          if (latest && Date.now() - new Date(latest.created_at).getTime() < VERIFICATION_RETRY_INTERVAL_MS) {
+            throw new Error('Aguarde um momento antes de solicitar outro código.');
+          }
+
+          const windowStart = new Date(Date.now() - 1000 * 60 * 60).toISOString();
+          const recentRow = db.prepare('SELECT COUNT(*) as c FROM verification_codes WHERE user_id = ? AND created_at > ?').get(user.id, windowStart) as { c?: number } | undefined;
+          const recentCount = Number(recentRow?.c ?? 0);
+          if (recentCount >= VERIFICATION_RETRY_MAX_PER_WINDOW) {
+            throw new Error('Muitas tentativas de reenvio. Tente novamente mais tarde.');
+          }
+
+          const priorCountRow = db.prepare('SELECT COUNT(*) as c FROM verification_codes WHERE user_id = ? AND used = 1').get(user.id) as { c?: number } | undefined;
+          const priorCount = Number(priorCountRow?.c ?? 0);
+          if (priorCount > 0) {
+            preferBrevo = true;
+            logger.info('[EMAIL] Segundo clique (ou posterior) detectado para reenvio de verificação. Priorizando Brevo.', { userId: user.id, priorCount });
+          }
+
+          usersRepository.invalidatePreviousVerificationCodes(user.id);
+          const newCode = randomNumericCode(6);
+          const codeHash = await bcrypt.hash(newCode, 10);
+          const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
+          usersRepository.createVerificationCode(user.id, codeHash, expiresAt);
+          db.exec('COMMIT');
+          return { code: newCode, preferBrevo };
+        } catch (error) {
+          if (db.inTransaction) db.exec('ROLLBACK');
+          throw error;
+        }
+      });
+    }));
+
+    // Email delivery happens after COMMIT; a failure here must not roll back the
+    // persisted code (retry-window still protects against spam) nor mask errors
+    // with a spurious ROLLBACK on a closed transaction.
     try {
-      usersRepository.invalidatePreviousVerificationCodes(user.id);
-      const code = randomNumericCode(6);
-      const codeHash = await bcrypt.hash(code, 10);
-      const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
-      usersRepository.createVerificationCode(user.id, codeHash, expiresAt);
-      db.exec('COMMIT');
-      
       await emailService.sendVerificationCode(user.email, code, 60, preferBrevo);
-      if (process.env.NODE_ENV === 'test') return { code, email: maskEmail(user.email) };
-      return { success: true, email: maskEmail(user.email) };
     } catch (error) {
-      db.exec('ROLLBACK');
+      logger.error('[EMAIL] Falha ao enviar código de verificação no reenvio', { userId: user.id, error: (error as Error).message });
       throw error;
     }
+    if (process.env.NODE_ENV === 'test') return { code, email: maskEmail(user.email) };
+    return { success: true, email: maskEmail(user.email) };
   },
 
   async forgotPassword(email: string) {
@@ -242,8 +308,6 @@ export const authService = {
       usersRepository.revokePasswordReset(resetId);
       throw error;
     }
-    // in test env return token to allow automated tests to reset password
-    if (process.env.NODE_ENV === 'test') return { token };
     return true;
   },
 
@@ -282,7 +346,7 @@ export const authService = {
       db.exec('COMMIT');
       return true;
     } catch (error) {
-      db.exec('ROLLBACK');
+      if (db.inTransaction) db.exec('ROLLBACK');
       throw error;
     }
   },

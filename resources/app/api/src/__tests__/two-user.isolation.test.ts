@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const PORT = process.env.TEST_PORT || '6010';
 const BASE = `http://127.0.0.1:${PORT}/api`;
 let serverProc: any = null;
+let tempDir: string | null = null;
 
 async function waitForServer(timeout = 15000) {
   const start = Date.now();
@@ -31,8 +34,9 @@ async function api(pathUrl: string, opts: any = {}) {
 }
 
 test('setup: start server', async () => {
-  const testDb = path.join(process.cwd(), 'data', `mertilo.test.twousers.${Date.now()}.db`);
-  serverProc = spawn(process.execPath, ['dist/index.js'], { env: { ...process.env, PORT, MERTILO_DB_PATH: testDb, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mertilo-two-user-'));
+  const testDb = path.join(tempDir, 'mertilo.test.twousers.db');
+  serverProc = spawn(process.execPath, ['dist/index.js'], { env: { ...process.env, PORT, MERTILO_DB_PATH: testDb, MERTILO_DATA_DIR: tempDir, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
   serverProc.stdout?.on('data', (d: any) => process.stdout.write(`[server] ${d}`));
   serverProc.stderr?.on('data', (d: any) => process.stderr.write(`[server-err] ${d}`));
   await waitForServer(15000);
@@ -43,21 +47,21 @@ let tokenB: string;
 let idsA: Record<string, any> = {};
 
 test('register and auth two users', async () => {
-  const uA = await api('/auth/register', { method: 'POST', body: JSON.stringify({ name: 'User A', email: 'a@example.test', password: 'password' }) });
+  const uA = await api('/auth/register', { method: 'POST', body: JSON.stringify({ name: 'User A', email: 'a@example.test', password: 'password123', acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   assert.strictEqual(uA.status, 201);
   const codeA = uA.body.verification_code;
   const vA = await api('/auth/verify-email', { method: 'POST', body: JSON.stringify({ email: 'a@example.test', code: codeA }) });
   assert.strictEqual(vA.status, 200);
-  const lA = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: 'a@example.test', password: 'password' }) });
+  const lA = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: 'a@example.test', password: 'password123' }) });
   assert.strictEqual(lA.status, 200);
   tokenA = lA.body.token;
 
-  const uB = await api('/auth/register', { method: 'POST', body: JSON.stringify({ name: 'User B', email: 'b@example.test', password: 'password' }) });
+  const uB = await api('/auth/register', { method: 'POST', body: JSON.stringify({ name: 'User B', email: 'b@example.test', password: 'password123', acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   assert.strictEqual(uB.status, 201);
   const codeB = uB.body.verification_code;
   const vB = await api('/auth/verify-email', { method: 'POST', body: JSON.stringify({ email: 'b@example.test', code: codeB }) });
   assert.strictEqual(vB.status, 200);
-  const lB = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: 'b@example.test', password: 'password' }) });
+  const lB = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: 'b@example.test', password: 'password123' }) });
   assert.strictEqual(lB.status, 200);
   tokenB = lB.body.token;
 });
@@ -153,5 +157,15 @@ test('User B cannot access or modify User A resources', async () => {
 });
 
 test('teardown: stop server', async () => {
-  serverProc.kill();
+  const proc = serverProc;
+  serverProc = null;
+  if (proc && proc.exitCode === null) {
+    await new Promise<void>((resolve) => {
+      proc.once('exit', () => resolve());
+      proc.kill();
+      setTimeout(resolve, 5000).unref();
+    });
+  }
+  if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  tempDir = null;
 });

@@ -48,11 +48,9 @@ function isLocalDevelopment() {
 }
 
 function getProviderChain(preferBrevo = false): EmailProvider[] {
-  const preference = process.env.NODE_ENV === 'test' && !process.env.EMAIL_PROVIDER ? 'mock' : getProviderPreference();
-  if (preference === 'mock' && process.env.NODE_ENV === 'test' && !process.env.MAILTRAP_API_TOKEN && !process.env.BREVO_API_KEY) {
-    return [new MockEmailProvider()];
-  }
-  
+  if (process.env.NODE_ENV === 'test') return [new MockEmailProvider()];
+
+  const preference = getProviderPreference();
   const mailtrap = new MailtrapEmailProvider();
   const brevo = new BrevoEmailProvider();
   
@@ -70,7 +68,7 @@ function getProviderChain(preferBrevo = false): EmailProvider[] {
     return brevoReady ? [brevo, ...(mailtrapReady ? [mailtrap] : [])] : [new MockEmailProvider()];
   }
   if (preference === 'hybrid') {
-    return mailtrapReady && brevoReady ? [mailtrap, brevo] : (mailtrapReady ? [mailtrap] : (brevoReady ? [brevo] : [new MockEmailProvider()]));
+    return brevoReady && mailtrapReady ? [brevo, mailtrap] : (brevoReady ? [brevo] : (mailtrapReady ? [mailtrap] : [new MockEmailProvider()]));
   }
   
   return mailtrapReady && brevoReady ? [mailtrap, brevo] : (mailtrapReady ? [mailtrap] : (brevoReady ? [brevo] : [new MockEmailProvider()]));

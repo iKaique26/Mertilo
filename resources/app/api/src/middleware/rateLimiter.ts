@@ -10,6 +10,16 @@ const identifierKey = process.env.RATE_LIMIT_KEY_SECRET || (() => {
 })();
 
 function getClientIp(req: Request): string {
+  const shouldTrustForwardedFor = process.env.NODE_ENV === 'test' || process.env.TRUST_PROXY_FOR_RATE_LIMIT === 'true';
+  if (shouldTrustForwardedFor) {
+    const forwardedFor = req.headers['x-forwarded-for'];
+    if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+      return forwardedFor.split(',')[0].trim();
+    }
+    if (Array.isArray(forwardedFor) && forwardedFor[0]) {
+      return forwardedFor[0].trim();
+    }
+  }
   return req.ip || req.socket.remoteAddress || 'unknown';
 }
 
@@ -29,15 +39,16 @@ function createRateLimiter(options: {
   keyPrefix: string;
   skipSuccessfulRequests?: boolean;
   skipFailedRequests?: boolean;
+  keyByIdentifier?: boolean;
 }) {
   return rateLimit({
     windowMs: options.windowMs,
     max: options.max,
     message: { error: options.message },
     standardHeaders: true,
-    legacyHeaders: false,
+    legacyHeaders: true,
     keyGenerator: (req: Request) => {
-      const identifier = getIdentifier(req);
+      const identifier = options.keyByIdentifier === false ? '' : getIdentifier(req);
       return identifier
         ? `${options.keyPrefix}:ip:${getClientIp(req)}:id:${hashIdentifier(identifier)}`
         : `${options.keyPrefix}:ip:${getClientIp(req)}`;
@@ -74,6 +85,7 @@ export const loginRateLimiter = createRateLimiter({
   max: 5,
   message: 'Muitas tentativas de login, tente novamente em 15 minutos',
   keyPrefix: 'login',
+  keyByIdentifier: false,
 });
 
 export const registerRateLimiter = createRateLimiter({

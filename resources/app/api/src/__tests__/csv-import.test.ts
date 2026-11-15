@@ -1,12 +1,28 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readUserData, writeUserData } from '../data/store.js';
-import { confirmCsvImport, parseCsvPreview, undoCsvImport, deleteImportedTransaction } from '../services/csv-import.service.js';
-import { exercisesRepository, documentsRepository, incomeRepository } from '../repositories/irpf.repository.js';
-import { irpfService } from '../services/irpf.service.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
+// Isolamento: banco SQLite e diretório de dados (data.json + backups) temporários, definidos
+// ANTES de importar os módulos que resolvem o caminho no carregamento (store.ts / getDatabase()).
+const TEST_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mertilo-csv-import-'));
+process.env.NODE_ENV = 'test';
+process.env.MERTILO_DATA_DIR = TEST_DIR;
+process.env.MERTILO_DB_PATH = path.join(TEST_DIR, 'mertilo.db');
+
+const { readUserData, writeUserData } = await import('../data/store.js');
+const { confirmCsvImport, parseCsvPreview, undoCsvImport, deleteImportedTransaction } = await import('../services/csv-import.service.js');
+const { exercisesRepository, documentsRepository, incomeRepository } = await import('../repositories/irpf.repository.js');
+const { irpfService } = await import('../services/irpf.service.js');
+const { initializeDatabase, shutdownDatabase } = await import('../database/index.js');
+
+await initializeDatabase();
+
+test.after(async () => {
+  try { await shutdownDatabase(); } catch { /* ignore */ }
+  fs.rmSync(TEST_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+});
 
 function resetData() {
   writeUserData('user-a', {
@@ -191,11 +207,12 @@ test('deleteImportedTransaction remove uma linha de importação e recalcula o m
 });
 
 test('deleteDocument remove arquivo físico e registros relacionados do IRPF', async () => {
-  const exercise = exercisesRepository.create(2027 + Math.floor(Math.random() * 1000));
+  const userId = `user_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  const exercise = exercisesRepository.create(2027, userId);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mertilo-irpf-'));
   const filePath = path.join(dir, 'holerite.pdf');
   fs.writeFileSync(filePath, 'fake pdf');
-
+  try {
   const doc = documentsRepository.create(exercise.id, {
     exercise_id: exercise.id,
     filename: 'holerite.pdf',
@@ -227,4 +244,7 @@ test('deleteDocument remove arquivo físico e registros relacionados do IRPF', a
   assert.equal(documentsRepository.getById(doc.id), null);
   assert.equal(incomeRepository.getById(income.id), null);
   assert.equal(fs.existsSync(filePath), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

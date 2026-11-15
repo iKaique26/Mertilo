@@ -1,9 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import { spawn } from 'child_process';
+import fs from 'node:fs';
+import net from 'node:net';
+import os from 'node:os';
 import path from 'path';
 
-const PORT = process.env.TEST_PORT || '6003';
+async function getFreePort() {
+  return await new Promise<number>((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address() as net.AddressInfo;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+let PORT = '6003';
 let serverProc: any = null;
 
 async function waitForServer(timeout = 10000) {
@@ -28,13 +42,37 @@ async function api(pathUrl: string, opts: any = {}) {
   return { status: res.status, body };
 }
 
+async function waitForFile(filePath: string, timeout = 10000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    if (fs.existsSync(filePath)) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out waiting for email capture file: ${filePath}`);
+}
+
 let token: string | null = null;
 let email: string;
 let password = 'Password123!';
 
 test('auth smoke', async (t) => {
-  const testDb = path.join(process.cwd(), 'data', `mertilo.auth.test.${Date.now()}.db`);
-  serverProc = spawn(process.execPath, ['dist/index.js'], { env: { ...process.env, PORT, MERTILO_DB_PATH: testDb, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  PORT = String(await getFreePort());
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mertilo-auth-smoke-'));
+  const testDb = path.join(tempDir, 'mertilo.auth.test.db');
+  const emailCapture = path.join(tempDir, 'mertilo.auth.email.json');
+  serverProc = spawn(process.execPath, ['dist/index.js'], { env: { ...process.env, PORT, MERTILO_DB_PATH: testDb, MERTILO_DATA_DIR: tempDir, MERTILO_TEST_EMAIL_FILE: emailCapture, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  t.after(async () => {
+    const proc = serverProc;
+    serverProc = null;
+    if (proc && proc.exitCode === null) {
+      await new Promise<void>((resolve) => {
+        proc.once('exit', () => resolve());
+        proc.kill();
+        setTimeout(resolve, 5000).unref();
+      });
+    }
+    fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
   serverProc.stdout?.on('data', (d: any) => process.stdout.write(`[server] ${d}`));
   serverProc.stderr?.on('data', (d: any) => process.stderr.write(`[server-err] ${d}`));
 
@@ -42,8 +80,8 @@ test('auth smoke', async (t) => {
 
   email = `test+auth_${Date.now()}@example.com`;
 
-  // register
-  const reg = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Auth Test', email, password }) });
+  // registro 
+  const reg = await fetch(`http://127.0.0.1:${PORT}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Auth Test', email, password, acceptTerms: true, dateOfBirth: '1990-01-01' }) });
   assert.strictEqual(reg.status, 201);
   const regBody = await reg.json();
   const verificationCode = regBody.verification_code;
@@ -73,11 +111,19 @@ test('auth smoke', async (t) => {
   assert.strictEqual(me2.status, 401);
 
   // forgot password (should return token in test env)
-  const forgot = await fetch(`http://127.0.0.1:${PORT}/api/auth/forgot-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+  const forgot = await fetch(`http://127.0.0.1:${PORT}/api/auth/forgot-password`, { 
+    method: 'POST', 
+    headers: {
+       'Content-Type': 
+       'application/json' },
+        body: JSON.stringify({ email }) });
   assert.strictEqual(forgot.status, 200);
   const forgotBody = await forgot.json();
-  const resetToken = forgotBody && forgotBody.token;
-  assert.ok(resetToken, 'Expected reset token in test env');
+  assert.deepStrictEqual(forgotBody, { success: true });
+  await waitForFile(emailCapture);
+  const emailMessage = JSON.parse(fs.readFileSync(emailCapture, 'utf8'));
+  const resetToken = emailMessage.text.match(/Reset-password\/([a-f0-9]{64})/)?.[1];
+  assert.ok(resetToken, 'Expected reset token in simulated email');
 
   // reset password
   const newPassword = 'NewPass123!';
@@ -89,5 +135,11 @@ test('auth smoke', async (t) => {
   assert.strictEqual(login2.status, 200);
 
   // stop server
-  serverProc.kill();
+  await new Promise<void>((resolve, reject) => {
+    const proc = serverProc;
+    if (!proc || proc.exitCode !== null) return resolve();
+    proc.once('error', reject);
+    proc.once('exit', () => resolve());
+    proc.kill('SIGTERM');
+  });
 });

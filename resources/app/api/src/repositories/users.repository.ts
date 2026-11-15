@@ -73,7 +73,7 @@ export const usersRepository = {
   // Verification codes
   createVerificationCode(userId: string, codeHash: string, expiresAt: string) {
     const db = getDatabase();
-    const id = Date.now().toString();
+    const id = `vc_${randomUUID()}`;
     const now = new Date().toISOString();
     db.prepare(`INSERT INTO verification_codes (id, user_id, code_hash, expires_at, attempts, used, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)`)

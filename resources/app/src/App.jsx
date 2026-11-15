@@ -6,11 +6,16 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { FinancialProvider } from './context/FinancialContext';
 import { TaxProvider } from './modules/irpf';
 import { AuthProvider } from './context/AuthContext';
+import { PrivacyProvider } from './context/PrivacyContext';
+import { ConsentBanner } from './components/Privacy/ConsentBanner';
+import { ConsentPreferencesModal } from './components/Privacy/ConsentPreferencesModal';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import VerifyEmail from './pages/Auth/VerifyEmail';
 import ForgotPassword from './pages/Auth/ForgotPassword';
 import ResetPassword from './pages/Auth/ResetPassword';
+import TermsOfUse from './pages/Legal/TermsOfUse';
+import PrivacyPolicy from './pages/Legal/PrivacyPolicy';
 import { RequireAuth } from './components/Auth/RequireAuth';
 import { MainLayout } from './components/layout/MainLayout';
 import { Dashboard } from './pages/Dashboard';
@@ -31,16 +36,19 @@ import { IRPFReview } from './modules/irpf/pages/Review';
 export function App() {
   return (
     <AuthProvider>
-      <FinancialProvider>
-        <TaxProvider>
-        <HashRouter>
-          <Routes>
+      <PrivacyProvider>
+        <FinancialProvider>
+          <TaxProvider>
+          <HashRouter>
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/Reset-password/:token" element={<ResetPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <Route path="/termos-de-uso" element={<TermsOfUse />} />
+            <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
 
             <Route
               path="/"
@@ -185,9 +193,12 @@ export function App() {
             {/* Rota curinga para redirecionar rotas inválidas */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          <ConsentBanner />
+          <ConsentPreferencesModal />
         </HashRouter>
         </TaxProvider>
       </FinancialProvider>
-    </AuthProvider>
-  );
+    </PrivacyProvider>
+  </AuthProvider>
+);
 }

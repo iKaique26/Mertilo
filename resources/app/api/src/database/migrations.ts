@@ -491,6 +491,18 @@ function executeMigration(db: Database.Database, migrationName: string): void {
 
     // Executar migration
     const transaction = db.transaction(() => {
+      if (migrationName === '013_legal_acceptance_integrity') {
+        const legalAcceptanceColumns = new Set(
+          (db.prepare('PRAGMA table_info(legal_acceptances)').all() as Array<{ name: string }>).map((column) => column.name),
+        );
+        cleanSql = cleanSql
+          .split(';')
+          .filter((statement) => {
+            const match = statement.match(/ALTER TABLE legal_acceptances ADD COLUMN (\w+)/i);
+            return !match || !legalAcceptanceColumns.has(match[1]);
+          })
+          .join(';');
+      }
       if (migrationName === '014_users_date_of_birth' && columnExists(db, 'users', 'date_of_birth')) {
         cleanSql = 'CREATE INDEX IF NOT EXISTS idx_users_date_of_birth ON users(date_of_birth);';
       }

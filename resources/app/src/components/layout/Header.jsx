@@ -3,9 +3,10 @@
  */
 
 import { useLocation } from 'react-router-dom';
-import { SlidersHorizontal, Settings, LogOut } from 'lucide-react';
+import { SlidersHorizontal, Settings, LogOut, Shield } from 'lucide-react';
 import { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../../context/AuthContext';
+import { usePrivacy } from '../../context/PrivacyContext';
 
 const pageMetadata = {
   '/': {
@@ -45,23 +46,22 @@ export function Header() {
   const location = useLocation();
   const [showFilters, setShowFilters] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState(() => {
-    const stored = localStorage.getItem(STORAGE_KEYS.period);
-    return stored || 'month';
-  });
+  const { user, logout } = useContext(AuthContext);
+  const { setShowModal, getFunctionalValue, setFunctionalValue } = usePrivacy();
+  const [selectedPeriod, setSelectedPeriod] = useState(() => getFunctionalValue(STORAGE_KEYS.period, 'month'));
 
   useEffect(() => {
     const handlePeriodChange = (event) => {
-      const nextValue = event.detail || localStorage.getItem(STORAGE_KEYS.period) || 'month';
+      const nextValue = event.detail || getFunctionalValue(STORAGE_KEYS.period, 'month');
       setSelectedPeriod(nextValue);
     };
 
     window.addEventListener('mertilo-period-change', handlePeriodChange);
     return () => window.removeEventListener('mertilo-period-change', handlePeriodChange);
-  }, []);
+  }, [getFunctionalValue]);
   const [settings, setSettings] = useState(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.settings);
+      const stored = getFunctionalValue(STORAGE_KEYS.settings);
       return stored ? JSON.parse(stored) : { notifications: true, performance: true };
     } catch {
       return { notifications: true, performance: true };
@@ -75,14 +75,13 @@ export function Header() {
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.period, selectedPeriod);
-  }, [selectedPeriod]);
+    setFunctionalValue(STORAGE_KEYS.period, selectedPeriod);
+  }, [selectedPeriod, setFunctionalValue]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
-  }, [settings]);
+    setFunctionalValue(STORAGE_KEYS.settings, JSON.stringify(settings));
+  }, [settings, setFunctionalValue]);
 
-  const { user, logout } = useContext(AuthContext);
   const userInitials = user ? (user.name || '').split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase() : '??';
 
   function togglePanel(panel) {
@@ -149,7 +148,7 @@ export function Header() {
                 aria-pressed={selectedPeriod === option.value}
                 onClick={() => {
                   setSelectedPeriod(option.value);
-                  localStorage.setItem(STORAGE_KEYS.period, option.value);
+                  setFunctionalValue(STORAGE_KEYS.period, option.value);
                   window.dispatchEvent(new CustomEvent('mertilo-period-change', { detail: option.value }));
                   setShowFilters(false);
                 }}
@@ -174,6 +173,18 @@ export function Header() {
               <span>Desempenho</span>
               <input type="checkbox" checked={Boolean(settings.performance)} onChange={() => updateSetting('performance')} />
             </label>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ marginTop: '0.50rem', justifyContent: 'center', width: '100%' }}
+              onClick={() => {
+                setShowSettings(false);
+                setShowModal(true);
+              }}
+            >
+              <Shield size={14} style={{ marginRight: '0.4rem' }} />
+              Preferências de Privacidade
+            </button>
           </div>
         </div>
       )}

@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import fs from 'node:fs';
 
 export type EmailMessage = {
   to: string;
@@ -125,6 +126,8 @@ export class MockEmailProvider implements EmailProvider {
 
   async send(message: EmailMessage): Promise<EmailResult> {
     this.calls.push(message);
+    const capturePath = process.env.MERTILO_TEST_EMAIL_FILE;
+    if (capturePath) fs.writeFileSync(capturePath, JSON.stringify(message), 'utf8');
     return {
       accepted: [message.to],
       messageId: `mock-${Date.now()}`,

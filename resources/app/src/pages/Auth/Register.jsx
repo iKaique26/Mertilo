@@ -1,66 +1,131 @@
+// Importa React e os hooks useState (estado local) e useContext (acessar contexto global)
 import React, { useState, useContext } from 'react';
+// Importa Link para navegação client-side entre rotas
 import { Link } from 'react-router-dom';
+// Importa o AuthContext, que expõe a função register() para criar a conta
 import { AuthContext } from '../../context/AuthContext';
+// Importa ícones: olho aberto/fechado (senha), cadeado (senha), envelope (e-mail) e usuário (nome)
 import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
+// Importa o logo SVG exibido no topo
 import logo from '../../assets/mirtilo-logo.svg';
 
+// Componente da página de Registro (criação de conta)
 export default function Register() {
+  // Consome do AuthContext apenas a função "register" (cria o usuário)
   const { register } = useContext(AuthContext);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+
+  // Estado para cada campo do formulário
+  const [name, setName] = useState('');                 // Nome completo
+  const [email, setEmail] = useState('');               // E-mail
+  const [password, setPassword] = useState('');         // Senha
+  const [confirm, setConfirm] = useState('');           // Confirmação da senha
+  const [dateOfBirth, setDateOfBirth] = useState('');   // Data de nascimento (input type="date")
+  const [acceptTerms, setAcceptTerms] = useState(false);// Checkbox de aceite dos termos
+
+  // Controles de visibilidade das senhas (mostrar como texto ou mascarar)
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Estado de loading durante a requisição de registro
   const [loading, setLoading] = useState(false);
+  // Mensagem de erro (null = sem erro)
   const [error, setError] = useState(null);
+  // Flag de sucesso: quando true, renderiza a tela de "conta criada"
   const [success, setSuccess] = useState(false);
+  // Controla a revelação do painel esquerdo (animação quando o usuário foca em algum campo)
   const [isRevealed, setIsRevealed] = useState(false);
 
+  // Focar em qualquer campo revela o painel visual esquerdo
   const handleFocus = () => setIsRevealed(true);
+
+  // Ao sair do foco: se o próximo elemento focado não pertence ao mesmo form,
+  // esconde novamente o painel esquerdo (evita "piscar" ao navegar entre campos)
   const handleBlur = (e) => {
     if (!e.currentTarget.form?.contains(e.relatedTarget)) {
       setIsRevealed(false);
     }
   };
 
+  // Função chamada ao submeter o formulário de registro
   const handleSubmit = async (e) => {
+    // Previne recarregamento da página
     e.preventDefault();
+    // Evita submit duplicado se já estiver carregando
     if (loading) return;
+    // Limpa erro anterior
     setError(null);
+
+    // Normaliza o e-mail (remove espaços, minúsculas)
     const normalizedEmail = email.trim().toLowerCase();
+
+    // Validação 1: todos os campos obrigatórios preenchidos
     if (!name.trim() || !normalizedEmail || !password || !confirm) {
       setError('Preencha todos os campos obrigatórios.');
       return;
     }
+    // Validação 2: formato do e-mail (algo@algo.algo)
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
       setError('Informe um e-mail válido.');
       return;
     }
+    // Validação 3: senha e confirmação coincidem
     if (password !== confirm) {
       setError('As senhas não coincidem.');
       return;
     }
+    // Validação 4: senha mínima de 8 caracteres
     if (password.length < 8) {
       setError('A senha deve ter ao menos 8 caracteres.');
       return;
     }
+    // Validação 5: data de nascimento informada
+    if (!dateOfBirth) {
+      setError('Informe sua data de nascimento. O Mertilo é exclusivo para maiores de 18 anos.');
+      return;
+    }
+    // Cálculo da idade a partir da data de nascimento (com fuso tratado via "T00:00:00")
+    const birthDate = new Date(`${dateOfBirth}T00:00:00`);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    // Ajusta a idade se o aniversário ainda não ocorreu este ano
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
+    // Validação 6: precisa ser maior de 18 anos
+    if (age < 18) {
+      setError('O Mertilo é exclusivo para maiores de 18 anos.');
+      return;
+    }
+    // Validação 7: aceite dos termos obrigatório
+    if (!acceptTerms) {
+      setError('Você deve aceitar os Termos de Uso e a Política de Privacidade.');
+      return;
+    }
+
+    // Ativa loading enquanto o registro está em andamento
     setLoading(true);
     try {
-      await register(name.trim(), normalizedEmail, password);
+      // Chama a função register do contexto (envia os dados para a API)
+      // Passa nome sem espaços extras, e-mail normalizado, senha, aceite e data de nascimento
+      await register(name.trim(), normalizedEmail, password, acceptTerms, dateOfBirth);
+      // Salva o e-mail na sessionStorage para usar na próxima tela (verificação de e-mail)
       sessionStorage.setItem('mertilo_verification_email', normalizedEmail);
+      // Ativa a tela de sucesso (a renderização abaixo muda)
       setSuccess(true);
     } catch (err) {
+      // Em caso de erro, mostra a mensagem retornada (ou fallback genérico)
       setError(err.message || 'Erro ao registrar');
     } finally {
+      // Desativa loading em qualquer caso
       setLoading(false);
     }
   };
 
+  // Se o registro teve sucesso, renderiza a tela de "Conta criada" (sem formulário)
   if (success) {
     return (
       <main className="login-page">
         <div className="login-page__frame">
+          {/* Painel esquerdo com identidade/branding (sempre oculto para leitores de tela nessa tela) */}
           <section
             className="login-page__identity"
             aria-hidden="true"
@@ -77,6 +142,7 @@ export default function Register() {
               <h1 id="register-brand-title">Um começo claro para seus planos.</h1>
               <p>Organize suas informações, acompanhe seu fluxo e construa seu planejamento com confiança.</p>
             </div>
+            {/* Gráfico decorativo */}
             <div className="login-page__graphic" aria-hidden="true">
               <div className="login-page__graphic-card">
                 <span className="login-page__graphic-label">Sua jornada financeira</span>
@@ -92,6 +158,7 @@ export default function Register() {
             </div>
           </section>
 
+          {/* Painel direito de sucesso: informa que a conta foi criada e oferece caminhos */}
           <section className="login-panel" aria-labelledby="register-title">
             <div className="login-panel__heading">
               <p className="login-panel__kicker">Cadastro realizado</p>
@@ -99,7 +166,9 @@ export default function Register() {
               <p>Verifique seu e-mail para o código de confirmação.</p>
             </div>
             <div className="login-panel__success">
+              {/* Link para a página de verificação de e-mail */}
               <Link to="/verify-email" viewTransition className="login-panel__verify-link">Ir para verificação</Link>
+              {/* Link para a página de login, caso o usuário já queira entrar */}
               <Link to="/login" viewTransition className="login-panel__login-link">Já tenho conta, entrar</Link>
             </div>
           </section>
@@ -108,9 +177,14 @@ export default function Register() {
     );
   }
 
+  // Renderização principal: formulário de cadastro
   return (
     <main className="login-page">
+      {/* Moldura dos dois painéis; classe extra aplicada quando isRevealed=true */}
       <div className={`login-page__frame ${isRevealed ? 'login-frame--expanded' : ''}`}>
+        {/* Painel esquerdo (identidade visual).
+            aria-hidden=true quando não revelado (esconde de leitores de tela).
+            aria-labelledby aponta para o título "register-brand-title" */}
         <section
           className={`login-page__identity ${isRevealed ? 'login-page__identity--revealed' : ''}`}
           aria-hidden={!isRevealed}
@@ -127,6 +201,7 @@ export default function Register() {
             <h1 id="register-brand-title">Sua organização financeira começa aqui.</h1>
             <p>Crie sua conta e tenha controle total do seu patrimônio, fluxo e planejamento.</p>
           </div>
+          {/* Gráfico decorativo (barras) — puramente visual */}
           <div className="login-page__graphic" aria-hidden="true">
             <div className="login-page__graphic-card">
               <span className="login-page__graphic-label">Patrimônio Líquido</span>
@@ -142,17 +217,25 @@ export default function Register() {
           </div>
         </section>
 
+        {/* Painel direito (formulário de cadastro).
+            Recebe classe "--shifted" quando isRevealed=true (animação) */}
         <section className={`login-panel ${isRevealed ? 'login-panel--shifted' : ''}`} aria-labelledby="register-title">
+          {/* Cabeçalho do formulário */}
           <div className="login-panel__heading">
             <p className="login-panel__kicker">Criar conta</p>
             <h2 id="register-title">Registrar-se</h2>
             <p>Preencha os dados para criar sua conta Mertilo</p>
           </div>
+          {/* Formulário com submit handler; noValidate desliga validação nativa */}
           <form onSubmit={handleSubmit} aria-label="register-form" noValidate>
+            {/* Campo: Nome */}
             <div className="login-field">
               <label htmlFor="register-name">Nome</label>
               <div className="login-field__control">
+                {/* Ícone de usuário */}
                 <User size={18} aria-hidden="true" />
+                {/* Input controlado; onFocus/onBlur controlam a revelação do painel esquerdo.
+                    aria-invalid e aria-describedby indicam erro para acessibilidade. */}
                 <input
                   id="register-name"
                   name="name"
@@ -171,9 +254,11 @@ export default function Register() {
               </div>
             </div>
 
+            {/* Campo: E-mail */}
             <div className="login-field">
               <label htmlFor="register-email">E-mail</label>
               <div className="login-field__control">
+                {/* Ícone de envelope */}
                 <Mail size={18} aria-hidden="true" />
                 <input
                   id="register-email"
@@ -193,10 +278,32 @@ export default function Register() {
               </div>
             </div>
 
+            {/* Campo: Data de nascimento.
+                max = hoje (não permite datas futuras).
+                aria-describedby aponta para o aviso de "maiores de 18". */}
+            <div className="login-field">
+              <label htmlFor="register-birth-date">Data de nascimento</label>
+              <input
+                id="register-birth-date"
+                name="dateOfBirth"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                required
+                max={new Date().toISOString().slice(0, 10)}
+                aria-describedby="adult-only-notice"
+              />
+              {/* Aviso de restrição de idade */}
+              <small id="adult-only-notice">Cadastro exclusivo para maiores de 18 anos.</small>
+            </div>
+
+            {/* Campo: Senha */}
             <div className="login-field">
               <label htmlFor="register-password">Senha</label>
               <div className="login-field__control">
+                {/* Ícone de cadeado */}
                 <Lock size={18} aria-hidden="true" />
+                {/* type alterna entre text/password conforme showPassword */}
                 <input
                   id="register-password"
                   name="password"
@@ -211,6 +318,8 @@ export default function Register() {
                   aria-invalid={Boolean(error)}
                   aria-describedby={error ? 'register-error' : undefined}
                 />
+                {/* Botão para mostrar/ocultar a senha.
+                    type="button" evita submit; aria-pressed reflete o estado. */}
                 <button
                   type="button"
                   className="login-field__visibility"
@@ -223,10 +332,13 @@ export default function Register() {
               </div>
             </div>
 
+            {/* Campo: Confirmar senha */}
             <div className="login-field">
               <label htmlFor="register-confirm-password">Confirmar senha</label>
               <div className="login-field__control">
                 <Lock size={18} aria-hidden="true" />
+                {/* aria-invalid true se houver erro OU se a senha não coincidir (e o campo já tiver conteúdo).
+                    aria-describedby aponta para o aviso de match quando as senhas coincidem. */}
                 <input
                   id="register-confirm-password"
                   name="confirm"
@@ -241,6 +353,7 @@ export default function Register() {
                   aria-invalid={Boolean(error) || (password !== confirm && confirm.length > 0)}
                   aria-describedby={error ? 'register-error' : confirm && password === confirm ? 'register-password-match' : undefined}
                 />
+                {/* Botão para mostrar/ocultar a confirmação */}
                 <button
                   type="button"
                   className="login-field__visibility"
@@ -251,15 +364,36 @@ export default function Register() {
                   {showConfirm ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                 </button>
               </div>
+              {/* Feedback imediato: mostra "Senhas coincidem" só quando confirm igual a password e ambos preenchidos */}
               {confirm && password === confirm && <p id="register-password-match" className="login-panel__field-hint">Senhas coincidem</p>}
             </div>
 
+            {/* Checkbox de aceite dos Termos de Uso e Política de Privacidade */}
+            <div className="login-field-checkbox" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '1rem 0' }}>
+              <input
+                id="register-terms"
+                type="checkbox"
+                checked={acceptTerms}
+                onChange={(e) => setAcceptTerms(e.target.checked)}
+                required
+                style={{ marginTop: '4px' }}
+              />
+              {/* Label com links para os termos (abrem em nova aba com target="_blank") */}
+              <label htmlFor="register-terms" style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
+                Li e aceito os <Link to="/termos-de-uso" target="_blank" style={{ color: 'var(--color-primary)' }}>Termos de Uso</Link> e a <Link to="/politica-de-privacidade" target="_blank" style={{ color: 'var(--color-primary)' }}>Política de Privacidade</Link> do Mertilo.
+              </label>
+            </div>
+
+            {/* Mensagem de erro (se houver). role="alert" para leitores de tela.
+                id="register-error" é referenciado pelos inputs via aria-describedby. */}
             {error && <div id="register-error" className="login-panel__error" role="alert">{error}</div>}
 
+            {/* Botão de submit: desabilitado em loading; mostra spinner ou texto "Criar conta" */}
             <button className="login-panel__submit" type="submit" disabled={loading} aria-disabled={loading}>
               {loading ? <span className="login-panel__spinner" /> : 'Criar conta'}
             </button>
           </form>
+          {/* Rodapé: link para login caso já tenha conta */}
           <p className="login-panel__signup">
             Já possui conta? <Link to="/login" viewTransition>Entrar</Link>
           </p>
@@ -268,4 +402,3 @@ export default function Register() {
     </main>
   );
 }
-

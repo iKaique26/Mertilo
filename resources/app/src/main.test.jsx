@@ -1,12 +1,15 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MemoryRouter } from 'react-router-dom';
 import App from './main.jsx';
 import { TaxProvider } from './modules/irpf/context/TaxIRPFContext';
 import { IRPF } from './modules/irpf/pages';
 import { Header } from './components/layout/Header';
+import { ConsentBanner } from './components/Privacy/ConsentBanner';
+import { ConsentPreferencesModal } from './components/Privacy/ConsentPreferencesModal';
 import { AuthContext } from './context/AuthContext';
 import { FinancialContext } from './context/FinancialContext';
+import { PrivacyProvider, usePrivacy } from './context/PrivacyContext';
 import { Dashboard } from './pages/Dashboard';
 
 beforeEach(() => {
@@ -59,7 +62,9 @@ test('o cabeçalho abre painel de filtros e configurações com interatividade r
         logout: vi.fn(),
         setUser: vi.fn(),
       }}>
-        <Header />
+        <PrivacyProvider>
+          <Header />
+        </PrivacyProvider>
       </AuthContext.Provider>
     </MemoryRouter>
   );
@@ -140,9 +145,11 @@ test('o filtro de período atualiza o dashboard e mostra recomendações de econ
   localStorage.setItem('mertilo_selected_period', 'quarter');
 
   render(
-    <FinancialContext.Provider value={{ state: mockState, dispatch: vi.fn() }}>
-      <Dashboard />
-    </FinancialContext.Provider>
+    <PrivacyProvider>
+      <FinancialContext.Provider value={{ state: mockState, dispatch: vi.fn() }}>
+        <Dashboard />
+      </FinancialContext.Provider>
+    </PrivacyProvider>
   );
 
   expect(screen.getByText(/recomendações de economia/i)).toBeInTheDocument();
@@ -207,5 +214,181 @@ test('espera a autenticação antes de carregar os dados financeiros', async () 
 
   await waitFor(() => {
     expect(global.fetch.mock.calls.some(([url]) => String(url).includes('/financas'))).toBe(true);
+  });
+});
+
+describe('consentimento de privacidade', () => {
+  test('não quebra ao encontrar localStorage indisponível', async () => {
+    const originalLocalStorage = window.localStorage;
+    const blockedStorage = {
+      getItem: () => { throw new Error('storage blocked'); },
+      setItem: () => { throw new Error('storage blocked'); },
+      removeItem: () => { throw new Error('storage blocked'); },
+    };
+
+    Object.defineProperty(window, 'localStorage', {
+      value: blockedStorage,
+      configurable: true,
+    });
+
+    function PrivacyConsumer() {
+      const { consent, saveConsent } = usePrivacy();
+      return (
+        <button
+          type="button"
+          onClick={() => saveConsent({ functional: true })}
+          data-testid="save-consent"
+        >
+          {consent ? 'saved' : 'no-consent'}
+        </button>
+      );
+    }
+
+    render(
+      <PrivacyProvider>
+        <PrivacyConsumer />
+      </PrivacyProvider>
+    );
+
+    expect(screen.getByText(/no-consent/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('save-consent'));
+    await waitFor(() => {
+      expect(screen.getByText(/no-consent/i)).toBeInTheDocument();
+    });
+
+    Object.defineProperty(window, 'localStorage', {
+      value: originalLocalStorage,
+      configurable: true,
+    });
+  });
+
+  test('ignora dados corrompidos e exibe banner de nova escolha', async () => {
+    localStorage.setItem('mertilo_privacy_consent', '{invalid-json');
+
+    render(
+      <PrivacyProvider>
+        <ConsentBanner />
+      </PrivacyProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: /privacidade e cookies/i })).toBeInTheDocument();
+    });
+  });
+
+  test('revoga preferências funcionais, bloqueia novas gravações e preserva token', async () => {
+    localStorage.setItem('mertilo_token', 'session-token');
+    localStorage.setItem('mertilo_selected_period', 'month');
+    localStorage.setItem('mertilo_account_settings', '{"theme":"dark"}');
+
+    function PrivacyConsumer() {
+      const { saveConsent, setFunctionalValue, functionalEnabled } = usePrivacy();
+      return (
+        <>
+          <button type="button" onClick={() => saveConsent({ functional: true })}>enable</button>
+          <button type="button" onClick={() => saveConsent({ functional: false })}>revoke</button>
+          <button type="button" onClick={() => setFunctionalValue('mertilo_selected_period', 'year')}>write</button>
+          <output>{String(functionalEnabled)}</output>
+        </>
+      );
+    }
+
+    render(<PrivacyProvider><PrivacyConsumer /></PrivacyProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'enable' }));
+    fireEvent.click(screen.getByRole('button', { name: 'write' }));
+    expect(localStorage.getItem('mertilo_selected_period')).toBe('year');
+
+    fireEvent.click(screen.getByRole('button', { name: 'revoke' }));
+    expect(localStorage.getItem('mertilo_selected_period')).toBeNull();
+    expect(localStorage.getItem('mertilo_account_settings')).toBeNull();
+    expect(localStorage.getItem('mertilo_token')).toBe('session-token');
+    expect(screen.getByText('false')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'write' }));
+    expect(localStorage.getItem('mertilo_selected_period')).toBeNull();
+  });
+
+  test('tenta remover todas chaves funcionais e exibe falha parcial', async () => {
+    localStorage.setItem('mertilo_selected_period', 'month');
+    localStorage.setItem('mertilo_account_settings', '{"theme":"dark"}');
+    const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+    const removed = [];
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key) => {
+      removed.push(key);
+      if (key === 'mertilo_selected_period') throw new Error('remove blocked');
+      originalRemoveItem(key);
+    });
+
+    function PrivacyConsumer() {
+      const { saveConsent, storageNotice } = usePrivacy();
+      return <><button type="button" onClick={() => saveConsent({ functional: false })}>revoke</button><output>{storageNotice}</output></>;
+    }
+
+    render(<PrivacyProvider><PrivacyConsumer /></PrivacyProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'revoke' }));
+    expect(removed).toEqual(expect.arrayContaining(['mertilo_selected_period', 'mertilo_account_settings']));
+    expect(screen.getByText(/não foi possível remover todas/i)).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
+  test('modal mantém foco, acessibilidade e restaura foco ao fechar', async () => {
+    function Harness() {
+      const { setShowModal } = usePrivacy();
+      return <><button type="button" onClick={() => setShowModal(true)}>open</button><ConsentPreferencesModal /></>;
+    }
+
+    render(<PrivacyProvider><Harness /></PrivacyProvider>);
+    const opener = screen.getByRole('button', { name: 'open' });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = await screen.findByRole('dialog', { name: /preferências de privacidade/i });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-describedby', 'privacy-modal-description');
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /ativar preferências funcionais/i })).toHaveFocus());
+
+    const close = screen.getByRole('button', { name: /fechar modal/i });
+    const save = screen.getByRole('button', { name: /salvar preferências/i });
+    save.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(close).toHaveFocus();
+    close.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(save).toHaveFocus();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+  });
+
+  test('sincroniza mudanças de consentimento entre abas', async () => {
+    render(
+      <PrivacyProvider>
+        <ConsentBanner />
+      </PrivacyProvider>
+    );
+
+    const consentPayload = {
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      preferences: {
+        necessary: true,
+        functional: true,
+        analytics: false,
+        marketing: false,
+      },
+    };
+
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'mertilo_privacy_consent',
+        newValue: JSON.stringify(consentPayload),
+      }));
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: /privacidade e cookies/i })).not.toBeInTheDocument();
+    });
   });
 });
