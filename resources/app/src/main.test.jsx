@@ -493,4 +493,22 @@ describe('consentimento de privacidade', () => {
     render(<PrivacyProvider><ConsentBanner /></PrivacyProvider>);
     expect(await screen.findByRole('region', { name: /privacidade e cookies/i })).toBeInTheDocument();
   });
+
+  test('mudança apenas na versão da política não exige nova manifestação', async () => {
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
+      version: '1.0.0',
+      policyVersion: '0.9.0',
+      timestamp: new Date().toISOString(),
+      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
+    }));
+
+    function FunctionalState() {
+      return <output>{String(usePrivacy().functionalEnabled)}</output>;
+    }
+
+    const { container } = render(<PrivacyProvider><FunctionalState /><ConsentBanner /></PrivacyProvider>);
+    expect(screen.getByText('true')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(container.querySelector('.consent-banner')).toBeNull();
+  });
 });
