@@ -64,6 +64,7 @@ test('o cabeçalho abre painel de filtros e configurações com interatividade r
       }}>
         <PrivacyProvider>
           <Header />
+          <ConsentPreferencesModal />
         </PrivacyProvider>
       </AuthContext.Provider>
     </MemoryRouter>
@@ -74,6 +75,8 @@ test('o cabeçalho abre painel de filtros e configurações com interatividade r
 
   fireEvent.click(screen.getByRole('button', { name: /abrir configurações/i }));
   expect(screen.getByText(/configurações da conta/i)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /preferências de privacidade/i }));
+  expect(screen.getByRole('dialog', { name: /preferências de privacidade/i })).toBeInTheDocument();
 });
 
 test('a página de IRPF renderiza os links de navegação do exercício', async () => {
@@ -281,6 +284,8 @@ describe('consentimento de privacidade', () => {
     localStorage.setItem('mertilo_token', 'session-token');
     localStorage.setItem('mertilo_selected_period', 'month');
     localStorage.setItem('mertilo_account_settings', '{"theme":"dark"}');
+    localStorage.setItem('mertilo_selected_period:account-a', 'quarter');
+    localStorage.setItem('mertilo_account_settings:account-b', '{"notifications":false}');
 
     function PrivacyConsumer() {
       const { saveConsent, setFunctionalValue, functionalEnabled } = usePrivacy();
@@ -302,6 +307,8 @@ describe('consentimento de privacidade', () => {
     fireEvent.click(screen.getByRole('button', { name: 'revoke' }));
     expect(localStorage.getItem('mertilo_selected_period')).toBeNull();
     expect(localStorage.getItem('mertilo_account_settings')).toBeNull();
+    expect(localStorage.getItem('mertilo_selected_period:account-a')).toBeNull();
+    expect(localStorage.getItem('mertilo_account_settings:account-b')).toBeNull();
     expect(localStorage.getItem('mertilo_token')).toBe('session-token');
     expect(screen.getByText('false')).toBeInTheDocument();
 
@@ -390,5 +397,100 @@ describe('consentimento de privacidade', () => {
     await waitFor(() => {
       expect(screen.queryByRole('region', { name: /privacidade e cookies/i })).not.toBeInTheDocument();
     });
+  });
+
+  test('revoga o consentimento em memória quando outra aba grava dados inválidos', async () => {
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
+    }));
+
+    function PrivacyState() {
+      const { functionalEnabled } = usePrivacy();
+      return <output>{String(functionalEnabled)}</output>;
+    }
+
+    render(<PrivacyProvider><PrivacyState /><ConsentBanner /></PrivacyProvider>);
+    expect(screen.getByText('true')).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'mertilo_privacy_consent',
+        newValue: '{broken-json',
+      }));
+    });
+
+    await waitFor(() => expect(screen.getByText('false')).toBeInTheDocument());
+    expect(await screen.findByRole('region', { name: /privacidade e cookies/i })).toBeInTheDocument();
+  });
+
+  test('não compartilha preferências funcionais entre contas no mesmo navegador', () => {
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
+    }));
+
+    const renderHeaderForUser = (id) => render(
+      <AuthContext.Provider value={{ user: { id, name: `User ${id}` }, logout: vi.fn() }}>
+        <PrivacyProvider>
+          <MemoryRouter initialEntries={['/']}>
+            <Header />
+          </MemoryRouter>
+        </PrivacyProvider>
+      </AuthContext.Provider>
+    );
+
+    const accountA = renderHeaderForUser('account-a');
+    fireEvent.click(screen.getByRole('button', { name: /abrir configurações/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /notificações/i }));
+    expect(localStorage.getItem('mertilo_account_settings:account-a')).toContain('"notifications":false');
+    accountA.unmount();
+    localStorage.setItem('mertilo_account_settings', '{"notifications":false}');
+
+    renderHeaderForUser('account-b');
+    fireEvent.click(screen.getByRole('button', { name: /abrir configurações/i }));
+    expect(screen.getByRole('checkbox', { name: /notificações/i })).toBeChecked();
+  });
+
+  test('login recupera as preferências da própria conta após outro usuário usar o navegador', () => {
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
+    }));
+    localStorage.setItem('mertilo_account_settings:account-a', '{"notifications":false}');
+
+    const readFor = (id) => {
+      let value;
+      function Reader() {
+        value = usePrivacy().getFunctionalValue('mertilo_account_settings');
+        return null;
+      }
+      const view = render(
+        <AuthContext.Provider value={{ user: id ? { id } : null }}>
+          <PrivacyProvider><Reader /></PrivacyProvider>
+        </AuthContext.Provider>
+      );
+      view.unmount();
+      return value;
+    };
+
+    expect(readFor('account-a')).toBe('{"notifications":false}');
+    expect(readFor('account-b')).toBeNull();
+    expect(readFor(null)).toBeNull();
+    expect(readFor('account-a')).toBe('{"notifications":false}');
+  });
+
+  test('consentimento de versão antiga é descartado e o banner reaparece', async () => {
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
+      version: '0.9.0',
+      timestamp: new Date().toISOString(),
+      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
+    }));
+
+    render(<PrivacyProvider><ConsentBanner /></PrivacyProvider>);
+    expect(await screen.findByRole('region', { name: /privacidade e cookies/i })).toBeInTheDocument();
   });
 });

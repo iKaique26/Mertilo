@@ -95,7 +95,7 @@ export const ConsentPreferencesModal = () => {
 
         <div className="privacy-modal__content">
           <p id="privacy-modal-description" className="privacy-modal__intro">
-            Gerencie como o Mertilo utiliza o armazenamento do seu navegador. Respeitamos sua privacidade e seguimos as diretrizes da LGPD.
+            Gerencie como o Mertilo utiliza o armazenamento local neste dispositivo. Respeitamos sua privacidade e seguimos as diretrizes da LGPD.
           </p>
 
           {storageNotice && (

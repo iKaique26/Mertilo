@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { AuthContext } from './AuthContext';
 
 export const PRIVACY_STORAGE_KEY = 'mertilo_privacy_consent';
 export const CONSENT_SCHEMA_VERSION = '1.0.0';
@@ -98,6 +99,8 @@ const buildConsentRecord = (preferences = {}) => ({
 });
 
 export const PrivacyProvider = ({ children }) => {
+  const auth = useContext(AuthContext);
+  const userId = auth?.user?.id;
   const [consent, setConsent] = useState(() => parseConsentFromStorageValue(safeStorageGet(PRIVACY_STORAGE_KEY)));
   const [showBanner, setShowBanner] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -127,6 +130,9 @@ export const PrivacyProvider = ({ children }) => {
       if (nextConsent) {
         setConsent(nextConsent);
         setStorageNotice('');
+      } else {
+        setConsent(null);
+        setStorageNotice('');
       }
     };
 
@@ -136,7 +142,21 @@ export const PrivacyProvider = ({ children }) => {
 
   const removeFunctionalValues = useCallback(() => {
     let removed = true;
-    for (const key of FUNCTIONAL_STORAGE_KEYS) {
+    const keysToRemove = new Set(FUNCTIONAL_STORAGE_KEYS);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        for (let index = 0; index < window.localStorage.length; index += 1) {
+          const key = window.localStorage.key(index);
+          if (key && FUNCTIONAL_STORAGE_KEYS.some((baseKey) => key.startsWith(`${baseKey}:`))) {
+            keysToRemove.add(key);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[PrivacyContext] Falha ao localizar preferências funcionais:', error);
+      removed = false;
+    }
+    for (const key of keysToRemove) {
       if (!safeStorageRemove(key)) removed = false;
     }
     return removed;
@@ -162,8 +182,14 @@ export const PrivacyProvider = ({ children }) => {
   const acceptAll = useCallback(() => saveConsent({ functional: true, analytics: false, marketing: false }), [saveConsent]);
   const rejectAll = useCallback(() => saveConsent({ functional: false, analytics: false, marketing: false }), [saveConsent]);
   const functionalEnabled = consent?.preferences.functional === true;
-  const getFunctionalValue = useCallback((key, fallback = null) => functionalEnabled ? (safeStorageGet(key) ?? fallback) : fallback, [functionalEnabled]);
-  const setFunctionalValue = useCallback((key, value) => functionalEnabled && safeStorageSet(key, value), [functionalEnabled]);
+  const getFunctionalValue = useCallback((key, fallback = null) => {
+    const scopedKey = userId ? `${key}:${userId}` : key;
+    return functionalEnabled ? (safeStorageGet(scopedKey) ?? fallback) : fallback;
+  }, [functionalEnabled, userId]);
+  const setFunctionalValue = useCallback((key, value) => {
+    const scopedKey = userId ? `${key}:${userId}` : key;
+    return functionalEnabled && safeStorageSet(scopedKey, value);
+  }, [functionalEnabled, userId]);
   return (
     <PrivacyContext.Provider
       value={{

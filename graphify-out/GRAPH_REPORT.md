@@ -1,28 +1,28 @@
-# Graph Report - Mertilo  (2026-11-14)
+# Graph Report - Mertilo  (2026-11-16)
 
 ## Corpus Check
-- 1512 files · ~3,900,663 words
+- 1749 files · ~4,590,762 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 242 file(s) not represented in the graph (top: .db-shm 80, .db-wal 80, .pak 56)
+- Unclassified: 244 file(s) not represented in the graph (top: .db-shm 80, .db-wal 80, .pak 56)
 
 ## Summary
-- 1356 nodes · 2671 edges · 90 communities (68 shown, 22 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 54 edges (avg confidence: 0.86)
+- 1395 nodes · 2747 edges · 85 communities (65 shown, 20 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 57 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b0e6830b`
+- Built from commit: `2989bbff`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - apiCall
-- legal-documents.ts
+- auth.service.ts
 - csv-import.service.ts
-- api/src/utils/logger.ts
+- verification-resend-concurrency.test.ts
 - app/package.json
 - AssistantService
-- test-upload.js
+- irpf/types/index.ts
 - email.service.ts
 - phase-1.md
 - migrations.ts
@@ -40,17 +40,17 @@
 - .eslintrc.json
 - compilerOptions
 - dependencies
-- holerite-reader.ts
+- pre-phase-3/src/app.ts
 - Dashboard/index.jsx
 - Template Conversion Rules
 - designSystem.js
 - Agent Skill: Principal UI/UX Architect & Motion Choreographer (Awwwards-Tier)
 - Getting Started
-- auth.service.ts
+- financial-http-isolation.test.ts
 - vercel.json
-- duplicate-detector.ts
+- pre-phase-3/src/schemas/validation.ts
 - TaxIRPFContext.tsx
-- rateLimiter.ts
+- api/src/app.ts
 - ref_fs
 - react
 - Sidebar.jsx
@@ -63,38 +63,33 @@
 - How to Migrate Email Templates to Mailtrap
 - IRPFDocuments
 - dependencies
-- api/src/services/salary.service.ts
+- Assistant/index.jsx
 - Quick reference
-- pre-phase-3/src/schemas/validation.ts
+- dependents.repository.test.ts
 - Receiving emails (Mailtrap Inbound Email)
 - scripts
 - Quick reference
 - PrivacyContext.jsx
-- main.cjs
+- express-rate-limit
 - App.jsx
-- consolidation.ts
 - Managing Mailtrap contacts
 - Quick reference
 - financial-http-isolation.test.ts
 - pre-phase-3/src/types.ts
-- irpf.controller.ts
+- pre-phase-3/src/utils/http.ts
 - api/src/utils/validation.ts
 - pre-phase-3/src/repositories/vehicle-expense.repository.ts
-- api/src/index.ts
-- pre-phase-3/src/repositories/history.repository.ts
+- ref_node_fs
+- pre-phase-3/src/controllers/salary.controller.ts
 - Response
 - Converting email templates
 - policy
-- sharp
+- api/src/schemas/validation.ts
 - ImportacaoFinanceira/index.jsx
-- irpf/types/index.ts
 - Authorizing Mailtrap API requests
-- Arquitetura
 - Test_segurança_site.ps1
 - pre-phase-3/src/utils/validation.ts
 - Setting up a Mailtrap sending domain
-- test-holerite.js
-- api/src/utils/schema.ts
 - vite-env.d.ts
 
 ## God Nodes (most connected - your core abstractions)
@@ -124,31 +119,31 @@
 ## Import Cycles
 - None detected.
 
-## Communities (90 total, 22 thin omitted)
+## Communities (85 total, 20 thin omitted)
 
 ### Community 0 - "apiCall"
-Cohesion: 0.12
-Nodes (29): AuthProvider(), init(), getAlertDescription(), IRPFAlerts(), loadAlerts(), resolveAlert(), IRPFAssets(), handleAddAsset() (+21 more)
+Cohesion: 0.14
+Nodes (25): AuthProvider(), init(), IRPFAssets(), handleAddAsset(), handleDeleteAsset(), loadAssets(), IRPFDeductions(), handleAddDeduction() (+17 more)
 
-### Community 1 - "legal-documents.ts"
-Cohesion: 0.23
-Nodes (11): currentLegalDocuments(), __dirname, __filename, getLegalDocument(), LEGAL_DOCUMENTS, LegalDocument, legalDocumentHash(), LegalDocumentsContainer (+3 more)
+### Community 1 - "auth.service.ts"
+Cohesion: 0.11
+Nodes (16): currentLegalDocuments(), __dirname, __filename, getLegalDocument(), LEGAL_DOCUMENTS, LegalDocument, legalDocumentHash(), LegalDocumentsContainer (+8 more)
 
 ### Community 2 - "csv-import.service.ts"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (44): DATA_FILE, DEFAULT_CATEGORIES, defaultData(), ensureDataFile(), moduleDir, normalizeData(), normalizeOwnerData(), OwnerData (+36 more)
 
-### Community 3 - "api/src/utils/logger.ts"
-Cohesion: 0.19
-Nodes (8): financialIntegrationService, AssistantAnalysis, AssistantCheckitem, AssistantIssue, TaxAlert, taxIntelligenceService, logger, LogLevel
+### Community 3 - "verification-resend-concurrency.test.ts"
+Cohesion: 0.11
+Nodes (17): assertRealOverlap(), first(), formatTimeline(), GateDb, nowMs(), outcomeOf(), RaceCall, RaceChild (+9 more)
 
 ### Community 4 - "app/package.json"
 Cohesion: 0.07
 Nodes (38): eslint, jsdom, @testing-library/dom, @testing-library/jest-dom, @testing-library/react, vite, @vitejs/plugin-react, vitest (+30 more)
 
-### Community 6 - "test-upload.js"
-Cohesion: 0.25
-Nodes (6): base64Content, fileContent, fileStats, options, payload, req
+### Community 6 - "irpf/types/index.ts"
+Cohesion: 0.18
+Nodes (10): Account, AppData, Category, FinancialAction, FinancialImportHistoryEntry, FinancialState, ImportedFinancialTransaction, MonthlyHistory (+2 more)
 
 ### Community 7 - "email.service.ts"
 Cohesion: 0.08
@@ -163,8 +158,8 @@ Cohesion: 0.08
 Nodes (31): db, tables, db, tables, better-sqlite3, db, db, rows (+23 more)
 
 ### Community 10 - "joi"
-Cohesion: 0.15
-Nodes (11): accountSchema, categorySchema, historySchema, vehicleExpenseSchema, joi, joi@^17.12.0, accountSchema, categorySchema (+3 more)
+Cohesion: 0.17
+Nodes (10): accountSchema, categorySchema, historySchema, vehicleExpenseSchema, joi, joi@^17.12.0, accountSchema, categorySchema (+2 more)
 
 ### Community 11 - "FinancialContext.tsx"
 Cohesion: 0.14
@@ -191,8 +186,8 @@ Cohesion: 0.10
 Nodes (19): runs-on, steps, strategy, jobs, build-test, node-version, name, branches (+11 more)
 
 ### Community 17 - "irpf.controller.ts"
-Cohesion: 0.08
-Nodes (41): backupDatabase(), getDatabase(), getDatabasePath(), moduleDir, withTransaction(), alertsRepository, assetsRepository, correctionsRepository (+33 more)
+Cohesion: 0.09
+Nodes (37): backupDatabase(), getDatabase(), getDatabasePath(), moduleDir, withTransaction(), alertsRepository, assetsRepository, correctionsRepository (+29 more)
 
 ### Community 18 - "pre-phase-3/src/data/store.ts"
 Cohesion: 0.24
@@ -203,8 +198,8 @@ Cohesion: 0.15
 Nodes (7): DocumentExtractionResult, documentReaderManager, ExtractedField, HoleriteReader, IDocumentReader, RendimentosReader, TextExtractor
 
 ### Community 20 - "file-processor.ts"
-Cohesion: 0.15
-Nodes (19): tesseract.js, tesseract.js@^7.0.0, calculateConfidence(), DocumentTypeResult, extractBankStatementFields(), ExtractedField, extractGenericFields(), extractIncomeStatementFields() (+11 more)
+Cohesion: 0.06
+Nodes (42): ConsolidatedHolerite, checkDuplicate(), checkDuplicateByHash(), checkDuplicatesInBatch(), DuplicateCheckResult, calculateConfidence(), DocumentTypeResult, extractBankStatementFields() (+34 more)
 
 ### Community 21 - ".eslintrc.json"
 Cohesion: 0.13
@@ -218,9 +213,9 @@ Nodes (13): compilerOptions, esModuleInterop, forceConsistentCasingInFileNames, 
 Cohesion: 0.33
 Nodes (6): react-dom, dependencies, lucide-react@^1.41.0, react@^18.3.1, react-dom@^18.3.1, react-router-dom@^7.18.3
 
-### Community 24 - "holerite-reader.ts"
-Cohesion: 0.39
-Nodes (6): extractField(), FIELD_PATTERNS, FieldPattern, parseCurrency(), readHolerite(), validateAndCalculateConfidence()
+### Community 24 - "pre-phase-3/src/app.ts"
+Cohesion: 0.15
+Nodes (9): allowedOrigins, app, configuredOrigins, __dirname, swaggerDocument, accountController, router, logger (+1 more)
 
 ### Community 25 - "Dashboard/index.jsx"
 Cohesion: 0.21
@@ -242,37 +237,37 @@ Nodes (17): 1. Meta Information & Core Directive, 2. THE "ABSOLUTE ZERO" DIRECTI
 Cohesion: 0.22
 Nodes (8): Building for Production, Features, Getting Started, Installation, License, Package the app for your platform, Prerequisites, Project Structure
 
-### Community 30 - "auth.service.ts"
-Cohesion: 0.16
-Nodes (10): bcryptjs, runDiagnostic(), bcryptjs@^2.4.3, User, usersRepository, authService, emailService, login() (+2 more)
+### Community 30 - "financial-http-isolation.test.ts"
+Cohesion: 0.18
+Nodes (6): bcryptjs, bcryptjs@^2.4.3, login(), createVerifiedUser(), createUser(), root
 
 ### Community 32 - "vercel.json"
 Cohesion: 0.29
 Nodes (6): buildCommand, framework, installCommand, outputDirectory, rewrites, $schema
 
-### Community 33 - "duplicate-detector.ts"
-Cohesion: 0.38
-Nodes (4): checkDuplicate(), checkDuplicateByHash(), checkDuplicatesInBatch(), DuplicateCheckResult
+### Community 33 - "pre-phase-3/src/schemas/validation.ts"
+Cohesion: 0.33
+Nodes (5): accountSchema, categorySchema, historySchema, salarySchema, vehicleExpenseSchema
 
 ### Community 34 - "TaxIRPFContext.tsx"
 Cohesion: 0.12
 Nodes (16): Integração, initialState, TaxAction, TaxContext, TaxProvider(), taxReducer(), TaxState, useTax() (+8 more)
 
-### Community 35 - "rateLimiter.ts"
-Cohesion: 0.08
-Nodes (33): Backend IRPF — Fase 8.3, allowedOrigins, app, configuredOrigins, __dirname, swaggerDocument, accountController, authController (+25 more)
+### Community 35 - "api/src/app.ts"
+Cohesion: 0.06
+Nodes (64): Arquitetura, Backend IRPF — Fase 8.3, Dependências compartilhadas, Estado anterior, Limites desta etapa, Organização atual, express, allowedOrigins (+56 more)
 
 ### Community 36 - "ref_fs"
-Cohesion: 0.18
-Nodes (4): text, tmpFilePath, dir, files
+Cohesion: 0.06
+Nodes (17): runDiagnostic(), text, tmpFilePath, result, text, validation, base64Content, fileContent (+9 more)
 
 ### Community 37 - "react"
-Cohesion: 0.23
-Nodes (6): lucide-react, react, react-router-dom, AuthContext, API_BASE_URL, RequestOptions
+Cohesion: 0.14
+Nodes (17): lucide-react, react, react-router-dom, Header(), pageMetadata, periodOptions, STORAGE_KEYS, ConsentBanner() (+9 more)
 
 ### Community 38 - "Sidebar.jsx"
-Cohesion: 0.24
-Nodes (7): Header(), pageMetadata, periodOptions, STORAGE_KEYS, MainLayout(), formatCurrency(), Sidebar()
+Cohesion: 0.70
+Nodes (3): MainLayout(), formatCurrency(), Sidebar()
 
 ### Community 39 - "*"
 Cohesion: 0.50
@@ -287,16 +282,20 @@ Cohesion: 0.21
 Nodes (10): ALLOWED_TYPES, getStatusColor(), IRPFDocuments(), confirmDocument(), handleDelete(), handleDrop(), handleFileUpload(), loadDocuments() (+2 more)
 
 ### Community 54 - "dependencies"
-Cohesion: 0.10
-Nodes (20): cors, express-rate-limit, jsonwebtoken, mailtrap, morgan, pdf-parse, swagger-ui-express, @types/morgan (+12 more)
+Cohesion: 0.09
+Nodes (22): cors, jsonwebtoken, mailtrap, morgan, pdf-parse, sharp, swagger-ui-express, tesseract.js (+14 more)
+
+### Community 55 - "Assistant/index.jsx"
+Cohesion: 0.53
+Nodes (5): getSeverityIcon(), IRPFAssistant(), loadAnalysis(), IssueSection(), StatCard()
 
 ### Community 56 - "Quick reference"
 Cohesion: 0.12
 Nodes (16): Choosing how to send, Common mistakes, Email API, Examples (`curl`), How to integrate (preference order), JSON body (non-template), JSON body (template), Overview (+8 more)
 
-### Community 57 - "pre-phase-3/src/schemas/validation.ts"
-Cohesion: 0.33
-Nodes (5): accountSchema, categorySchema, historySchema, salarySchema, vehicleExpenseSchema
+### Community 57 - "dependents.repository.test.ts"
+Cohesion: 0.40
+Nodes (4): db, dbPath, dependentA, dependentB
 
 ### Community 58 - "Receiving emails (Mailtrap Inbound Email)"
 Cohesion: 0.12
@@ -311,20 +310,12 @@ Cohesion: 0.12
 Nodes (15): API base, Common mistakes, Example API paths, Key parameters, Overview, Quick reference, Sandbox email address, SDKs (+7 more)
 
 ### Community 61 - "PrivacyContext.jsx"
-Cohesion: 0.13
-Nodes (21): ConsentBanner(), ConsentPreferencesModal(), defaultPreferences, buildConsentRecord(), CONSENT_SCHEMA_VERSION, DEFAULT_PREFERENCES, FUNCTIONAL_STORAGE_KEYS, normalizeConsentRecord() (+13 more)
-
-### Community 62 - "main.cjs"
-Cohesion: 0.28
-Nodes (3): checkBackendReady(), ensureBackend(), isPortInUse()
+Cohesion: 0.19
+Nodes (15): buildConsentRecord(), CONSENT_SCHEMA_VERSION, DEFAULT_PREFERENCES, FUNCTIONAL_STORAGE_KEYS, normalizeConsentRecord(), normalizePreferences(), parseConsentFromStorageValue(), PRIVACY_POLICY_VERSION (+7 more)
 
 ### Community 63 - "App.jsx"
-Cohesion: 0.23
-Nodes (14): App(), RequireAuth(), getSeverityIcon(), IRPFAssistant(), loadAnalysis(), IssueSection(), StatCard(), ForgotPassword() (+6 more)
-
-### Community 64 - "consolidation.ts"
-Cohesion: 0.33
-Nodes (3): ConsolidatedHolerite, FileExtractionResult, HoleriteData
+Cohesion: 0.18
+Nodes (13): App(), RequireAuth(), getAlertDescription(), IRPFAlerts(), loadAlerts(), resolveAlert(), ForgotPassword(), Login() (+5 more)
 
 ### Community 65 - "Managing Mailtrap contacts"
 Cohesion: 0.14
@@ -335,48 +326,48 @@ Cohesion: 0.14
 Nodes (13): API operations, Authorization, Common mistakes, Example (`curl`) — template send, Generating template HTML, Handlebars (supported patterns), Overview, Payload shape (+5 more)
 
 ### Community 68 - "financial-http-isolation.test.ts"
-Cohesion: 0.07
-Nodes (17): envPath, transporter, db, dbPath, dependentA, dependentB, root, dataDir (+9 more)
+Cohesion: 0.10
+Nodes (11): emailService, TEST_DIR, TEST_DIR, dataDir, db, dbPath, dependentB, now (+3 more)
 
 ### Community 69 - "pre-phase-3/src/types.ts"
 Cohesion: 0.38
-Nodes (5): accountRepository, categoryRepository, Account, AppData, Category
+Nodes (5): accountRepository, historyRepository, Account, AppData, MonthlyHistory
 
-### Community 70 - "irpf.controller.ts"
-Cohesion: 0.07
-Nodes (45): allowedOrigins, app, configuredOrigins, __dirname, swaggerDocument, accountController, categoryController, historyController (+37 more)
+### Community 70 - "pre-phase-3/src/utils/http.ts"
+Cohesion: 0.19
+Nodes (9): categoryController, historyController, router, router, accountService, categoryService, historyService, badRequest() (+1 more)
 
 ### Community 71 - "api/src/utils/validation.ts"
 Cohesion: 0.43
 Nodes (4): TripType, validateCategoryPayload(), validateHistorySummary(), validateVehicleExpense()
 
 ### Community 72 - "pre-phase-3/src/repositories/vehicle-expense.repository.ts"
-Cohesion: 0.60
-Nodes (3): vehicleExpenseRepository, vehicleExpenseService, VehicleExpense
+Cohesion: 0.33
+Nodes (5): vehicleExpenseController, router, vehicleExpenseRepository, vehicleExpenseService, VehicleExpense
 
-### Community 73 - "api/src/index.ts"
-Cohesion: 0.29
-Nodes (6): dotenv, dotenv@^16.4.5, apiDirectory, envPath, shutdown(), start()
+### Community 73 - "ref_node_fs"
+Cohesion: 0.15
+Nodes (9): dotenv, dotenv@^16.4.5, envPath, transporter, apiDirectory, envPath, shutdown(), start() (+1 more)
+
+### Community 74 - "pre-phase-3/src/controllers/salary.controller.ts"
+Cohesion: 0.38
+Nodes (4): salaryController, router, salaryRepository, salaryService
 
 ### Community 76 - "Converting email templates"
 Cohesion: 0.17
 Nodes (11): Converting email templates, Inline conversion (no file), Input, Purpose, Rules, Step 1: Detect mode, Step 2: Run the converter script, Step 3: Handle flags (Deep mode) (+3 more)
 
+### Community 78 - "api/src/schemas/validation.ts"
+Cohesion: 0.33
+Nodes (5): accountSchema, categorySchema, historySchema, salarySchema, vehicleExpenseSchema
+
 ### Community 79 - "ImportacaoFinanceira/index.jsx"
 Cohesion: 0.22
 Nodes (4): formatCurrency(), ImportacaoFinanceira(), previewFallback, financialImportService
 
-### Community 80 - "irpf/types/index.ts"
-Cohesion: 0.18
-Nodes (10): Account, AppData, Category, FinancialAction, FinancialImportHistoryEntry, FinancialState, ImportedFinancialTransaction, MonthlyHistory (+2 more)
-
 ### Community 81 - "Authorizing Mailtrap API requests"
 Cohesion: 0.18
 Nodes (10): API tokens, Auth headers (two equivalent forms), Authorizing Mailtrap API requests, Common mistakes, Overview, Quick reference, Recommended env var names, Resolving `account_id` automatically (+2 more)
-
-### Community 82 - "Arquitetura"
-Cohesion: 0.33
-Nodes (5): Arquitetura, Dependências compartilhadas, Estado anterior, Limites desta etapa, Organização atual
 
 ### Community 83 - "Test_segurança_site.ps1"
 Cohesion: 0.44
@@ -390,33 +381,25 @@ Nodes (4): TripType, validateCategoryPayload(), validateHistorySummary(), valida
 Cohesion: 0.20
 Nodes (9): Authorization, Automating setup (API and DNS providers), DNS provider guides (documentation), Important DNS caveat (proxied DNS), Overview, Setting up a Mailtrap sending domain, When not to use, When to use (+1 more)
 
-### Community 88 - "test-holerite.js"
-Cohesion: 0.29
-Nodes (3): result, text, validation
-
-### Community 89 - "api/src/utils/schema.ts"
-Cohesion: 0.40
-Nodes (4): accountSchema, categorySchema, historySchema, vehicleExpenseSchema
-
 ## Knowledge Gaps
 - **1 isolated node(s):** `eslint:recommended`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 547 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 574 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **20 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `requireAuth()` connect `rateLimiter.ts` to `csv-import.service.ts`, `auth.service.ts`?**
-  _High betweenness centrality (0.179) - this node is a cross-community bridge._
+- **Why does `requireAuth()` connect `api/src/app.ts` to `auth.service.ts`, `csv-import.service.ts`?**
+  _High betweenness centrality (0.165) - this node is a cross-community bridge._
 - **What connects `eslint:recommended` to the rest of the system?**
   _1 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `apiCall` be split into smaller, more focused modules?**
-  _Cohesion score 0.125 - nodes in this community are weakly interconnected._
-- **Why does `Arquitetura` connect `Arquitetura` to `TaxIRPFContext.tsx`, `rateLimiter.ts`?**
-  _High betweenness centrality (0.179) - this node is a cross-community bridge._
+  _Cohesion score 0.14039408866995073 - nodes in this community are weakly interconnected._
+- **Why does `Arquitetura` connect `api/src/app.ts` to `TaxIRPFContext.tsx`?**
+  _High betweenness centrality (0.160) - this node is a cross-community bridge._
+- **Should `auth.service.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.11076923076923077 - nodes in this community are weakly interconnected._
 - **Should `csv-import.service.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.10460992907801418 - nodes in this community are weakly interconnected._
-- **Why does `Backend IRPF — Fase 8.3` connect `rateLimiter.ts` to `Arquitetura`?**
-  _High betweenness centrality (0.179) - this node is a cross-community bridge._
-- **Should `app/package.json` be split into smaller, more focused modules?**
-  _Cohesion score 0.06538461538461539 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09387755102040816 - nodes in this community are weakly interconnected._
+- **Should `verification-resend-concurrency.test.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._

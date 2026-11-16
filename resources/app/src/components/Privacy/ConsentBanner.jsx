@@ -14,28 +14,28 @@ export const ConsentBanner = () => {
           <ShieldCheck className="consent-banner__icon" size={24} />
           <div className="consent-banner__text">
             <p>
-              Utilizamos tecnologias de armazenamento para melhorar sua experiência e garantir a segurança. 
-              Algumas são essenciais para o funcionamento do Mertilo.
+              Utilizamos armazenamento local para melhorar sua experiência e garantir a segurança.
+              Algumas tecnologias são essenciais para o funcionamento do Mertilo.
             </p>
           </div>
         </div>
         <div className="consent-banner__actions">
-          <button 
-            className="btn btn-secondary btn-sm" 
+          <button
+            className="btn btn-secondary btn-sm"
             onClick={() => setShowModal(true)}
             aria-label="Personalizar preferências de privacidade"
           >
             <Settings2 size={16} />
             <span>Personalizar</span>
           </button>
-          <button 
-            className="btn btn-secondary btn-sm" 
+          <button
+            className="btn btn-secondary btn-sm"
             onClick={rejectAll}
           >
             Recusar opcionais
           </button>
-          <button 
-            className="btn btn-primary btn-sm" 
+          <button
+            className="btn btn-primary btn-sm"
             onClick={acceptAll}
           >
             Aceitar todos
@@ -43,7 +43,8 @@ export const ConsentBanner = () => {
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .consent-banner {
           position: fixed;
           bottom: 1.5rem;
