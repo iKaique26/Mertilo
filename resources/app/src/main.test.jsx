@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MemoryRouter } from 'react-router-dom';
 import App from './main.jsx';
@@ -11,6 +11,7 @@ import { AuthContext } from './context/AuthContext';
 import { FinancialContext } from './context/FinancialContext';
 import { PrivacyProvider, usePrivacy } from './context/PrivacyContext';
 import { Dashboard } from './pages/Dashboard';
+import Register from './pages/Auth/Register';
 
 beforeEach(() => {
   localStorage.clear();
@@ -510,5 +511,63 @@ describe('consentimento de privacidade', () => {
     expect(screen.getByText('true')).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(container.querySelector('.consent-banner')).toBeNull();
+  });
+});
+
+describe('cadastro', () => {
+  const renderRegister = (register = vi.fn()) => {
+    const view = render(
+      <MemoryRouter>
+        <AuthContext.Provider value={{ register }}>
+          <Register />
+        </AuthContext.Provider>
+      </MemoryRouter>
+    );
+    return { ...view, ui: within(view.container), register };
+  };
+
+  test('erros são específicos por campo, associados via ARIA e limpos ao corrigir', () => {
+    const { ui, container } = renderRegister();
+    const name = ui.getByLabelText('Nome');
+    const email = ui.getByLabelText('E-mail');
+    const birth = ui.getByLabelText('Data de nascimento');
+
+    fireEvent.change(name, { target: { value: 'Maria' } });
+    fireEvent.change(email, { target: { value: 'email-invalido' } });
+    fireEvent.change(ui.getByLabelText('Senha'), { target: { value: 'senha-forte-1' } });
+    fireEvent.change(ui.getByLabelText('Confirmar senha'), { target: { value: 'senha-forte-1' } });
+    fireEvent.submit(container.querySelector('form'));
+
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(email).toHaveAttribute('aria-describedby', 'register-email-error');
+    expect(ui.getByText('Informe um e-mail válido.')).toHaveAttribute('id', 'register-email-error');
+    expect(name).toHaveAttribute('aria-invalid', 'false');
+    expect(birth).toHaveAttribute('aria-invalid', 'false');
+    expect(ui.getByLabelText('Senha')).toHaveAttribute('aria-invalid', 'false');
+
+    fireEvent.change(email, { target: { value: 'maria@example.com' } });
+    expect(email).toHaveAttribute('aria-invalid', 'false');
+    fireEvent.submit(container.querySelector('form'));
+
+    expect(birth).toHaveAttribute('aria-invalid', 'true');
+    expect(birth.getAttribute('aria-describedby')).toBe('register-dateOfBirth-error adult-only-notice');
+    expect(email).toHaveAttribute('aria-invalid', 'false');
+  });
+
+  test('erro geral da API não marca nenhum campo como inválido', async () => {
+    const register = vi.fn().mockRejectedValue(new Error('Falha geral do servidor'));
+    const { ui, container } = renderRegister(register);
+
+    fireEvent.change(ui.getByLabelText('Nome'), { target: { value: 'Maria' } });
+    fireEvent.change(ui.getByLabelText('E-mail'), { target: { value: 'maria@example.com' } });
+    fireEvent.change(ui.getByLabelText('Senha'), { target: { value: 'senha-forte-1' } });
+    fireEvent.change(ui.getByLabelText('Confirmar senha'), { target: { value: 'senha-forte-1' } });
+    fireEvent.change(ui.getByLabelText('Data de nascimento'), { target: { value: '1990-01-01' } });
+    fireEvent.click(ui.getByRole('checkbox'));
+    fireEvent.submit(container.querySelector('form'));
+
+    expect(await ui.findByText('Falha geral do servidor')).toHaveAttribute('role', 'alert');
+    expect(register).toHaveBeenCalledWith('Maria', 'maria@example.com', 'senha-forte-1', true, '1990-01-01');
+    expect(container.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0);
   });
 });

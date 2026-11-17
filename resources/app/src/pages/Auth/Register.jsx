@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 // Importa o AuthContext, que expõe a função register() para criar a conta
 import { AuthContext } from '../../context/AuthContext';
 // Importa ícones: olho aberto/fechado (senha), cadeado (senha), envelope (e-mail) e usuário (nome)
-import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
+import { Calendar, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
 // Importa o logo SVG exibido no topo
 import logo from '../../assets/mirtilo-logo.svg';
 
@@ -28,8 +28,8 @@ export default function Register() {
 
   // Estado de loading durante a requisição de registro
   const [loading, setLoading] = useState(false);
-  // Mensagem de erro (null = sem erro)
-  const [error, setError] = useState(null);
+  // Erros por campo (name, email, password, confirm, dateOfBirth, terms) e erro geral da API (form)
+  const [errors, setErrors] = useState({});
   // Flag de sucesso: quando true, renderiza a tela de "conta criada"
   const [success, setSuccess] = useState(false);
   // Controla a revelação do painel esquerdo (animação quando o usuário foca em algum campo)
@@ -46,41 +46,64 @@ export default function Register() {
     }
   };
 
+  // Remove o erro dos campos informados quando o usuário os edita
+  const clearErrors = (...fields) => setErrors((prev) => {
+    const next = { ...prev };
+    fields.forEach((field) => delete next[field]);
+    return next;
+  });
+
+  // Atributos ARIA de um campo: aria-invalid só quando ele tem erro; aria-describedby liga a mensagem (e ids extras)
+  const a11y = (field, ...extraIds) => {
+    const ids = [errors[field] && `register-${field}-error`, ...extraIds].filter(Boolean).join(' ');
+    return { 'aria-invalid': Boolean(errors[field]), 'aria-describedby': ids || undefined };
+  };
+
+  // Mensagem de erro específica de um campo
+  const fieldError = (field) => errors[field] && (
+    <p id={`register-${field}-error`} className="login-panel__field-error" role="alert">{errors[field]}</p>
+  );
+
   // Função chamada ao submeter o formulário de registro
   const handleSubmit = async (e) => {
     // Previne recarregamento da página
     e.preventDefault();
     // Evita submit duplicado se já estiver carregando
     if (loading) return;
-    // Limpa erro anterior
-    setError(null);
+    // Limpa erros anteriores
+    setErrors({});
 
     // Normaliza o e-mail (remove espaços, minúsculas)
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Validação 1: todos os campos obrigatórios preenchidos
-    if (!name.trim() || !normalizedEmail || !password || !confirm) {
-      setError('Preencha todos os campos obrigatórios.');
+    // Validação 1: todos os campos obrigatórios preenchidos (cada campo vazio recebe a sua mensagem)
+    const missing = {};
+    if (!name.trim()) missing.name = 'Informe seu nome.';
+    if (!normalizedEmail) missing.email = 'Informe seu e-mail.';
+    if (!password) missing.password = 'Informe uma senha.';
+    if (!confirm) missing.confirm = 'Confirme sua senha.';
+    if (Object.keys(missing).length) {
+      setErrors(missing);
       return;
     }
     // Validação 2: formato do e-mail (algo@algo.algo)
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      setError('Informe um e-mail válido.');
+      setErrors({ email: 'Informe um e-mail válido.' });
       return;
     }
     // Validação 3: senha e confirmação coincidem
     if (password !== confirm) {
-      setError('As senhas não coincidem.');
+      setErrors({ confirm: 'As senhas não coincidem.' });
       return;
     }
     // Validação 4: senha mínima de 8 caracteres
     if (password.length < 8) {
-      setError('A senha deve ter ao menos 8 caracteres.');
+      setErrors({ password: 'A senha deve ter ao menos 8 caracteres.' });
       return;
     }
     // Validação 5: data de nascimento informada
     if (!dateOfBirth) {
-      setError('Informe sua data de nascimento. O Mertilo é exclusivo para maiores de 18 anos.');
+      setErrors({ dateOfBirth: 'Informe sua data de nascimento. O Mertilo é exclusivo para maiores de 18 anos.' });
       return;
     }
     // Cálculo da idade a partir da data de nascimento (com fuso tratado via "T00:00:00")
@@ -92,12 +115,12 @@ export default function Register() {
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
     // Validação 6: precisa ser maior de 18 anos
     if (age < 18) {
-      setError('O Mertilo é exclusivo para maiores de 18 anos.');
+      setErrors({ dateOfBirth: 'O Mertilo é exclusivo para maiores de 18 anos.' });
       return;
     }
     // Validação 7: aceite dos termos obrigatório
     if (!acceptTerms) {
-      setError('Você deve aceitar os Termos de Uso e a Política de Privacidade.');
+      setErrors({ terms: 'Você deve aceitar os Termos de Uso e a Política de Privacidade.' });
       return;
     }
 
@@ -112,8 +135,8 @@ export default function Register() {
       // Ativa a tela de sucesso (a renderização abaixo muda)
       setSuccess(true);
     } catch (err) {
-      // Em caso de erro, mostra a mensagem retornada (ou fallback genérico)
-      setError(err.message || 'Erro ao registrar');
+      // Em caso de erro da API, mostra a mensagem retornada (ou fallback genérico) como erro geral
+      setErrors({ form: err.message || 'Erro ao registrar' });
     } finally {
       // Desativa loading em qualquer caso
       setLoading(false);
@@ -240,7 +263,7 @@ export default function Register() {
                   id="register-name"
                   name="name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => { setName(e.target.value); clearErrors('name'); }}
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   type="text"
@@ -248,10 +271,10 @@ export default function Register() {
                   inputMode="text"
                   placeholder="Seu nome completo"
                   required
-                  aria-invalid={Boolean(error)}
-                  aria-describedby={error ? 'register-error' : undefined}
+                  {...a11y('name')}
                 />
               </div>
+              {fieldError('name')}
             </div>
 
             {/* Campo: E-mail */}
@@ -264,7 +287,7 @@ export default function Register() {
                   id="register-email"
                   name="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); clearErrors('email'); }}
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   type="email"
@@ -272,29 +295,36 @@ export default function Register() {
                   inputMode="email"
                   placeholder="SeuEmail@exemplo.com"
                   required
-                  aria-invalid={Boolean(error)}
-                  aria-describedby={error ? 'register-error' : undefined}
+                  {...a11y('email')}
                 />
               </div>
+              {fieldError('email')}
             </div>
 
             {/* Campo: Data de nascimento.
                 max = hoje (não permite datas futuras).
-                aria-describedby aponta para o aviso de "maiores de 18". */}
+                aria-describedby aponta para o erro (se houver) e para o aviso de "maiores de 18". */}
             <div className="login-field">
-              <label htmlFor="register-birth-date">Data de nascimento</label>
-              <input
-                id="register-birth-date"
-                name="dateOfBirth"
-                type="date"
-                value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
-                required
-                max={new Date().toISOString().slice(0, 10)}
-                aria-describedby="adult-only-notice"
-              />
+              <label htmlFor="register-dateOfBirth">Data de nascimento</label>
+              <div className="login-field__control">
+                {/* Ícone de calendário */}
+                <Calendar size={18} aria-hidden="true" />
+                <input
+                  id="register-dateOfBirth"
+                  name="dateOfBirth"
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => { setDateOfBirth(e.target.value); clearErrors('dateOfBirth'); }}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                  required
+                  max={new Date().toISOString().slice(0, 10)}
+                  {...a11y('dateOfBirth', 'adult-only-notice')}
+                />
+              </div>
+              {fieldError('dateOfBirth')}
               {/* Aviso de restrição de idade */}
-              <small id="adult-only-notice">Cadastro exclusivo para maiores de 18 anos.</small>
+              <small id="adult-only-notice" className="login-field__note">Cadastro exclusivo para maiores de 18 anos.</small>
             </div>
 
             {/* Campo: Senha */}
@@ -308,15 +338,14 @@ export default function Register() {
                   id="register-password"
                   name="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); clearErrors('password', 'confirm'); }}
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   placeholder="Crie uma senha forte"
                   required
-                  aria-invalid={Boolean(error)}
-                  aria-describedby={error ? 'register-error' : undefined}
+                  {...a11y('password')}
                 />
                 {/* Botão para mostrar/ocultar a senha.
                     type="button" evita submit; aria-pressed reflete o estado. */}
@@ -330,6 +359,7 @@ export default function Register() {
                   {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                 </button>
               </div>
+              {fieldError('password')}
             </div>
 
             {/* Campo: Confirmar senha */}
@@ -338,20 +368,20 @@ export default function Register() {
               <div className="login-field__control">
                 <Lock size={18} aria-hidden="true" />
                 {/* aria-invalid true se houver erro OU se a senha não coincidir (e o campo já tiver conteúdo).
-                    aria-describedby aponta para o aviso de match quando as senhas coincidem. */}
+                    aria-describedby aponta para o erro ou, quando as senhas coincidem, para o aviso de match. */}
                 <input
                   id="register-confirm-password"
                   name="confirm"
                   value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
+                  onChange={(e) => { setConfirm(e.target.value); clearErrors('confirm'); }}
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   type={showConfirm ? 'text' : 'password'}
                   autoComplete="new-password"
                   placeholder="Confirme sua senha"
                   required
-                  aria-invalid={Boolean(error) || (password !== confirm && confirm.length > 0)}
-                  aria-describedby={error ? 'register-error' : confirm && password === confirm ? 'register-password-match' : undefined}
+                  {...a11y('confirm', confirm && password === confirm && 'register-password-match')}
+                  aria-invalid={Boolean(errors.confirm) || (password !== confirm && confirm.length > 0)}
                 />
                 {/* Botão para mostrar/ocultar a confirmação */}
                 <button
@@ -364,29 +394,32 @@ export default function Register() {
                   {showConfirm ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                 </button>
               </div>
+              {fieldError('confirm')}
               {/* Feedback imediato: mostra "Senhas coincidem" só quando confirm igual a password e ambos preenchidos */}
               {confirm && password === confirm && <p id="register-password-match" className="login-panel__field-hint">Senhas coincidem</p>}
             </div>
 
             {/* Checkbox de aceite dos Termos de Uso e Política de Privacidade */}
-            <div className="login-field-checkbox" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '1rem 0' }}>
+            <div className="login-field-checkbox">
               <input
                 id="register-terms"
                 type="checkbox"
                 checked={acceptTerms}
-                onChange={(e) => setAcceptTerms(e.target.checked)}
+                onChange={(e) => { setAcceptTerms(e.target.checked); clearErrors('terms'); }}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 required
-                style={{ marginTop: '4px' }}
+                {...a11y('terms')}
               />
               {/* Label com links para os termos (abrem em nova aba com target="_blank") */}
-              <label htmlFor="register-terms" style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
-                Li e aceito os <Link to="/termos-de-uso" target="_blank" style={{ color: 'var(--color-primary)' }}>Termos de Uso</Link> e a <Link to="/politica-de-privacidade" target="_blank" style={{ color: 'var(--color-primary)' }}>Política de Privacidade</Link> do Mertilo.
+              <label htmlFor="register-terms">
+                Li e aceito os <Link to="/termos-de-uso" target="_blank">Termos de Uso</Link> e a <Link to="/politica-de-privacidade" target="_blank">Política de Privacidade</Link> do Mertilo.
               </label>
             </div>
+            {fieldError('terms')}
 
-            {/* Mensagem de erro (se houver). role="alert" para leitores de tela.
-                id="register-error" é referenciado pelos inputs via aria-describedby. */}
-            {error && <div id="register-error" className="login-panel__error" role="alert">{error}</div>}
+            {/* Erro geral (ex.: resposta da API sem campo associado). role="alert" para leitores de tela. */}
+            {errors.form && <div id="register-form-error" className="login-panel__error" role="alert">{errors.form}</div>}
 
             {/* Botão de submit: desabilitado em loading; mostra spinner ou texto "Criar conta" */}
             <button className="login-panel__submit" type="submit" disabled={loading} aria-disabled={loading}>
