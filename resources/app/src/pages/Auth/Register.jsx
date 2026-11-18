@@ -317,7 +317,7 @@ export default function Register() {
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   type="text"
-                  autoComplete="name"
+                  autoComplete="new-name"
                   inputMode="text"
                   placeholder="Seu nome completo"
                   required
@@ -341,7 +341,7 @@ export default function Register() {
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   type="email"
-                  autoComplete="email"
+                  autoComplete="one-time-code"
                   inputMode="email"
                   placeholder="SeuEmail@exemplo.com"
                   required

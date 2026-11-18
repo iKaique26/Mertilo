@@ -142,7 +142,7 @@ export default function ForgotPassword() {
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   type="email"
-                  autoComplete="email"
+                  autoComplete="one-time-code"
                   inputMode="email"
                   placeholder="SeuEmail@exemplo.com"
                   required
