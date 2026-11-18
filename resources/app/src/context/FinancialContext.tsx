@@ -58,7 +58,7 @@ function financialReducer(
     case 'ADD_ACCOUNT':
       return {
         ...state,
-        accounts: [...state.accounts, action.payload],
+        accounts: [action.payload, ...state.accounts],
       };
 
     case 'UPDATE_ACCOUNT':
@@ -78,7 +78,7 @@ function financialReducer(
     case 'ADD_CATEGORY':
       return {
         ...state,
-        categories: [...state.categories, action.payload],
+        categories: [action.payload, ...state.categories],
       };
 
     case 'UPDATE_CATEGORY':
@@ -87,6 +87,12 @@ function financialReducer(
         categories: state.categories.map((cat) =>
           cat.id === action.payload.id ? action.payload : cat
         ),
+      };
+
+    case 'DELETE_CATEGORY':
+      return {
+        ...state,
+        categories: state.categories.filter((cat) => cat.id !== action.payload),
       };
 
     case 'SET_SALARY':

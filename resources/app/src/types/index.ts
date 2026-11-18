@@ -18,5 +18,6 @@ export type FinancialAction =
   | { type: 'DELETE_ACCOUNT'; payload: string }
   | { type: 'ADD_CATEGORY'; payload: Category }
   | { type: 'UPDATE_CATEGORY'; payload: Category }
+  | { type: 'DELETE_CATEGORY'; payload: string }
   | { type: 'SET_SALARY'; payload: number }
   | { type: 'SET_SELECTED_CATEGORY'; payload: string | null };

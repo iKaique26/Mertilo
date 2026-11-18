@@ -138,7 +138,7 @@ export default function Login() {
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   type="email"
-                  autoComplete="email"
+                  autoComplete="one-time-code"
                   inputMode="email"
                   placeholder="SeuEmail@exemplo.com"
                   required
@@ -169,7 +169,7 @@ export default function Login() {
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   placeholder="Sua senha"
                   required
                   aria-invalid={Boolean(error)}

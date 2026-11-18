@@ -1,0 +1,11 @@
+﻿AlertCircle object
+AlertTriangle object
+X object
+PlusCircle object
+Edit2 object
+Trash2 object
+Wallet object
+Tag object
+Check object
+Loader2 object
+ChevronDown object
