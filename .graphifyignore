@@ -1,0 +1,24 @@
+# Graphify ignore rules (gitignore spec, last-match-wins, overrides .gitignore).
+# Purpose: keep the knowledge graph focused on live source code.
+# Everything excluded here produces zero knowledge-graph value:
+#   - runtime data snapshots (JSON) -> extracted as empty "skipped" stubs
+#   - archived duplicate sources      -> dead nodes that shadow the live modules
+
+# Archived pre-phase-3 snapshot of the API source (live copy lives in
+# resources/app/api/src). Including it added 95 dead nodes / 205 edges.
+backup/
+
+# Runtime data directory: seeded JSON, migrations and app state.
+# Contributes no symbols; only pollutes the index and the AST cache.
+resources/app/api/data/
+
+# SQLite database files and their WAL/SHM sidecars (binary).
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Local secrets — never index these.
+.env
+.env.*

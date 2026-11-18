@@ -3,9 +3,26 @@ import { apiCall } from '../services/api/client';
 
 export const AuthContext = createContext(null);
 
+const safeTokenGet = () => {
+  try {
+    return localStorage.getItem('mertilo_token');
+  } catch (error) {
+    console.warn('[AuthContext] Não foi possível ler o token do armazenamento local:', error);
+    return null;
+  }
+};
+
+const safeTokenRemove = () => {
+  try {
+    localStorage.removeItem('mertilo_token');
+  } catch (error) {
+    console.warn('[AuthContext] Não foi possível remover o token do armazenamento local:', error);
+  }
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem('mertilo_token'));
+  const [token, setToken] = useState(() => safeTokenGet());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,7 +32,7 @@ export function AuthProvider({ children }) {
           const me = await apiCall('/auth/me');
           setUser(me);
         } catch (err) {
-          localStorage.removeItem('mertilo_token');
+          safeTokenRemove();
           setToken(null);
           setUser(null);
         }
@@ -27,7 +44,11 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await apiCall('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-    localStorage.setItem('mertilo_token', res.token);
+    try {
+      localStorage.setItem('mertilo_token', res.token);
+    } catch (error) {
+      console.warn('[AuthContext] Não foi possível salvar o token no armazenamento local:', error);
+    }
     setToken(res.token);
     setUser(res.user);
     return res;
@@ -44,7 +65,7 @@ export function AuthProvider({ children }) {
     } catch (e) {
       // ignore
     }
-    localStorage.removeItem('mertilo_token');
+    safeTokenRemove();
     setToken(null);
     setUser(null);
   };

@@ -1914,6 +1914,35 @@ textarea::placeholder {
 .login-panel__back-link { display: inline-flex; align-items: center; gap: 8px; color: #a78bfa; text-decoration: none; font-weight: 600; }
 .login-panel__back-link:hover { color: #c4b5fd; text-decoration: underline; }
 
+/* --- Cadastro em 3 etapas --- */
+.register-steps { margin: 0 0 20px; }
+.register-steps__counter { margin: 0 0 10px; color: #94a3b8; font-size: .84rem; }
+.register-steps__counter strong { color: #e2e8f0; font-weight: 700; }
+.register-steps__list { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.register-steps__item { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 7px; color: #64748b; font-size: .78rem; transition: color 180ms ease; }
+.register-steps__dot { flex: 0 0 24px; width: 24px; height: 24px; display: grid; place-items: center; color: #94a3b8; background: rgba(15,29,45,.82); border: 1px solid rgba(148,163,184,.4); border-radius: 50%; font-size: .74rem; font-weight: 700; transition: background 180ms ease,border-color 180ms ease,color 180ms ease; }
+.register-steps__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.register-steps__item.is-current { color: #e2e8f0; font-weight: 650; }
+.register-steps__item.is-current .register-steps__dot { color: #fff; background: linear-gradient(135deg, #8b5cf6, #6d4bd8); border-color: rgba(196,181,253,.4); box-shadow: 0 0 0 3px rgba(139,92,246,.14); }
+.register-steps__item.is-done { color: #94a3b8; }
+.register-steps__item.is-done .register-steps__dot { color: #fff; background: rgba(139,92,246,.55); border-color: rgba(167,139,250,.5); }
+
+.register-summary { margin: 0 0 18px; padding: 14px 16px; display: grid; gap: 10px; background: rgba(15,29,45,.55); border: 1px solid rgba(148,163,184,.18); border-radius: 10px; }
+.register-summary__row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.register-summary__row dt { flex: 0 0 auto; color: #94a3b8; font-size: .82rem; }
+.register-summary__row dd { margin: 0; min-width: 0; color: #e2e8f0; font-size: .86rem; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+.register-nav { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.register-nav__next { flex: 1 1 auto; }
+.register-nav__back { flex: 0 0 auto; min-height: 52px; padding: 0 18px; color: #cbd5e1; background: rgba(15,29,45,.82); border: 1px solid rgba(148,163,184,.32); border-radius: 10px; font: inherit; font-weight: 650; cursor: pointer; transition: background 180ms ease,border-color 180ms ease,color 180ms ease; }
+.register-nav__back:hover { color: #e2e8f0; background: rgba(30,41,59,.9); border-color: rgba(167,139,250,.5); }
+.register-nav__back:focus-visible { outline: 3px solid rgba(56,189,248,.7); outline-offset: 3px; }
+
+@media (max-width: 560px) {
+  .register-steps__label { display: none; }
+  .register-steps__item { flex: 0 0 auto; }
+}
+
 .login-panel__success { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
 .login-panel__verify-link, .login-panel__login-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px; color: #fff; background: #8b5cf6; border: 1px solid transparent; border-radius: 10px; font: inherit; font-weight: 600; text-decoration: none; transition: background 160ms ease, transform 160ms ease; }
 .login-panel__verify-link:hover, .login-panel__login-link:hover { background: #7c3aed; transform: translateY(-1px); }

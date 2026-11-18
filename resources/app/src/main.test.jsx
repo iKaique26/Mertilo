@@ -9,13 +9,21 @@ import { ConsentBanner } from './components/Privacy/ConsentBanner';
 import { ConsentPreferencesModal } from './components/Privacy/ConsentPreferencesModal';
 import { AuthContext } from './context/AuthContext';
 import { FinancialContext } from './context/FinancialContext';
-import { PrivacyProvider, usePrivacy } from './context/PrivacyContext';
+import { PrivacyProvider, usePrivacy, PRIVACY_POLICY_VERSION } from './context/PrivacyContext';
 import { Dashboard } from './pages/Dashboard';
 import Register from './pages/Auth/Register';
 
 beforeEach(() => {
   localStorage.clear();
   global.fetch = vi.fn();
+});
+
+const consentRecord = (overrides = {}) => ({
+  version: '1.0.0',
+  policyVersion: PRIVACY_POLICY_VERSION,
+  timestamp: new Date().toISOString(),
+  preferences: { necessary: true, functional: true, analytics: false, marketing: false },
+  ...overrides,
 });
 
 test('renderiza a tela de login para usuário não autenticado', async () => {
@@ -281,6 +289,58 @@ describe('consentimento de privacidade', () => {
     });
   });
 
+  test('banner avisa quando a preferência não pode ser salva', async () => {
+    const originalSetItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => {
+      if (key === 'mertilo_privacy_consent') throw new Error('set blocked');
+      originalSetItem.call(Storage.prototype, key, value);
+    });
+
+    render(
+      <PrivacyProvider>
+        <ConsentBanner />
+      </PrivacyProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: /privacidade e cookies/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /aceitar todos/i }));
+
+    expect(await screen.findByText(/não foi possível salvar a preferência de privacidade/i)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /privacidade e cookies/i })).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
+  test('app não quebra quando o armazenamento local está indisponível', async () => {
+    const originalLocalStorage = window.localStorage;
+    Object.defineProperty(window, 'localStorage', {
+      value: {
+        getItem: () => { throw new Error('storage blocked'); },
+        setItem: () => { throw new Error('storage blocked'); },
+        removeItem: () => { throw new Error('storage blocked'); },
+        key: () => null,
+        length: 0,
+        clear: () => {},
+      },
+      configurable: true,
+    });
+
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+
+    expect(() => render(<App />)).not.toThrow();
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/acesse sua conta mertilo/i).length).toBeGreaterThan(0);
+    });
+
+    Object.defineProperty(window, 'localStorage', {
+      value: originalLocalStorage,
+      configurable: true,
+    });
+  });
+
   test('revoga preferências funcionais, bloqueia novas gravações e preserva token', async () => {
     localStorage.setItem('mertilo_token', 'session-token');
     localStorage.setItem('mertilo_selected_period', 'month');
@@ -300,10 +360,14 @@ describe('consentimento de privacidade', () => {
       );
     }
 
-    render(<PrivacyProvider><PrivacyConsumer /></PrivacyProvider>);
+    render(
+      <AuthContext.Provider value={{ user: { id: 'account-a' } }}>
+        <PrivacyProvider><PrivacyConsumer /></PrivacyProvider>
+      </AuthContext.Provider>
+    );
     fireEvent.click(screen.getByRole('button', { name: 'enable' }));
     fireEvent.click(screen.getByRole('button', { name: 'write' }));
-    expect(localStorage.getItem('mertilo_selected_period')).toBe('year');
+    expect(localStorage.getItem('mertilo_selected_period:account-a')).toBe('year');
 
     fireEvent.click(screen.getByRole('button', { name: 'revoke' }));
     expect(localStorage.getItem('mertilo_selected_period')).toBeNull();
@@ -314,7 +378,25 @@ describe('consentimento de privacidade', () => {
     expect(screen.getByText('false')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'write' }));
+    expect(localStorage.getItem('mertilo_selected_period:account-a')).toBeNull();
+  });
+
+  test('não persiste preferências funcionais sem usuário autenticado', () => {
+    function PrivacyConsumer() {
+      const { saveConsent, setFunctionalValue } = usePrivacy();
+      return (
+        <>
+          <button type="button" onClick={() => saveConsent({ functional: true })}>enable</button>
+          <button type="button" onClick={() => setFunctionalValue('mertilo_selected_period', 'year')}>write</button>
+        </>
+      );
+    }
+
+    render(<PrivacyProvider><PrivacyConsumer /></PrivacyProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'enable' }));
+    fireEvent.click(screen.getByRole('button', { name: 'write' }));
     expect(localStorage.getItem('mertilo_selected_period')).toBeNull();
+    expect(localStorage.getItem('mertilo_selected_period:undefined')).toBeNull();
   });
 
   test('tenta remover todas chaves funcionais e exibe falha parcial', async () => {
@@ -377,16 +459,7 @@ describe('consentimento de privacidade', () => {
       </PrivacyProvider>
     );
 
-    const consentPayload = {
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-      preferences: {
-        necessary: true,
-        functional: true,
-        analytics: false,
-        marketing: false,
-      },
-    };
+    const consentPayload = consentRecord();
 
     act(() => {
       window.dispatchEvent(new StorageEvent('storage', {
@@ -401,11 +474,7 @@ describe('consentimento de privacidade', () => {
   });
 
   test('revoga o consentimento em memória quando outra aba grava dados inválidos', async () => {
-    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
-    }));
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify(consentRecord()));
 
     function PrivacyState() {
       const { functionalEnabled } = usePrivacy();
@@ -427,11 +496,7 @@ describe('consentimento de privacidade', () => {
   });
 
   test('não compartilha preferências funcionais entre contas no mesmo navegador', () => {
-    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
-    }));
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify(consentRecord()));
 
     const renderHeaderForUser = (id) => render(
       <AuthContext.Provider value={{ user: { id, name: `User ${id}` }, logout: vi.fn() }}>
@@ -456,11 +521,7 @@ describe('consentimento de privacidade', () => {
   });
 
   test('login recupera as preferências da própria conta após outro usuário usar o navegador', () => {
-    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
-    }));
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify(consentRecord()));
     localStorage.setItem('mertilo_account_settings:account-a', '{"notifications":false}');
 
     const readFor = (id) => {
@@ -485,32 +546,22 @@ describe('consentimento de privacidade', () => {
   });
 
   test('consentimento de versão antiga é descartado e o banner reaparece', async () => {
-    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
-      version: '0.9.0',
-      timestamp: new Date().toISOString(),
-      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
-    }));
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify(consentRecord({ version: '0.9.0' })));
 
     render(<PrivacyProvider><ConsentBanner /></PrivacyProvider>);
     expect(await screen.findByRole('region', { name: /privacidade e cookies/i })).toBeInTheDocument();
   });
 
-  test('mudança apenas na versão da política não exige nova manifestação', async () => {
-    localStorage.setItem('mertilo_privacy_consent', JSON.stringify({
-      version: '1.0.0',
-      policyVersion: '0.9.0',
-      timestamp: new Date().toISOString(),
-      preferences: { necessary: true, functional: true, analytics: false, marketing: false },
-    }));
+  test('nova versão da política exige nova manifestação', async () => {
+    localStorage.setItem('mertilo_privacy_consent', JSON.stringify(consentRecord({ policyVersion: '0.9.0' })));
 
     function FunctionalState() {
       return <output>{String(usePrivacy().functionalEnabled)}</output>;
     }
 
-    const { container } = render(<PrivacyProvider><FunctionalState /><ConsentBanner /></PrivacyProvider>);
-    expect(screen.getByText('true')).toBeInTheDocument();
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    expect(container.querySelector('.consent-banner')).toBeNull();
+    render(<PrivacyProvider><FunctionalState /><ConsentBanner /></PrivacyProvider>);
+    expect(screen.getByText('false')).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: /privacidade e cookies/i })).toBeInTheDocument();
   });
 });
 
@@ -526,6 +577,144 @@ describe('cadastro', () => {
     return { ...view, ui: within(view.container), register };
   };
 
+  // Preenche a etapa 1 (Seus dados) e avança para a etapa 2
+  const fillStep1 = (ui) => {
+    fireEvent.change(ui.getByLabelText('Nome'), { target: { value: 'Maria' } });
+    fireEvent.change(ui.getByLabelText('E-mail'), { target: { value: 'maria@example.com' } });
+    fireEvent.change(ui.getByLabelText('Data de nascimento'), { target: { value: '1990-01-01' } });
+  };
+
+  // Preenche a etapa 2 (Segurança) e avança para a etapa 3
+  const fillStep2 = (ui) => {
+    fireEvent.change(ui.getByLabelText('Senha'), { target: { value: 'senha-forte-1' } });
+    fireEvent.change(ui.getByLabelText('Confirmar senha'), { target: { value: 'senha-forte-1' } });
+  };
+
+  test('exibe apenas os campos da etapa atual e o indicador de progresso', () => {
+    const { ui } = renderRegister();
+
+    // Etapa 1: apenas dados pessoais
+    expect(ui.getByText('Etapa 1 de 3')).toBeInTheDocument();
+    expect(ui.getByLabelText('Nome')).toBeInTheDocument();
+    expect(ui.getByLabelText('E-mail')).toBeInTheDocument();
+    expect(ui.getByLabelText('Data de nascimento')).toBeInTheDocument();
+    expect(ui.queryByLabelText('Senha')).not.toBeInTheDocument();
+    expect(ui.queryByLabelText('Confirmar senha')).not.toBeInTheDocument();
+    expect(ui.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(ui.queryByRole('button', { name: 'Voltar' })).not.toBeInTheDocument();
+
+    // Avança para a etapa 2
+    fillStep1(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    expect(ui.getByText('Etapa 2 de 3')).toBeInTheDocument();
+    expect(ui.getByLabelText('Senha')).toBeInTheDocument();
+    expect(ui.getByLabelText('Confirmar senha')).toBeInTheDocument();
+    expect(ui.queryByLabelText('Nome')).not.toBeInTheDocument();
+    expect(ui.queryByRole('checkbox')).not.toBeInTheDocument();
+
+    // Avança para a etapa 3
+    fillStep2(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    expect(ui.getByText('Etapa 3 de 3')).toBeInTheDocument();
+    expect(ui.getByRole('checkbox')).toBeInTheDocument();
+    expect(ui.queryByLabelText('Nome')).not.toBeInTheDocument();
+    expect(ui.queryByLabelText('Senha')).not.toBeInTheDocument();
+  });
+
+  test('preserva os dados ao voltar e seguir novamente', () => {
+    const { ui } = renderRegister();
+
+    fillStep1(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    fillStep2(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+
+    fireEvent.click(ui.getByRole('button', { name: 'Voltar' }));
+    expect(ui.getByText('Etapa 2 de 3')).toBeInTheDocument();
+    expect(ui.getByLabelText('Senha')).toHaveValue('senha-forte-1');
+
+    fireEvent.click(ui.getByRole('button', { name: 'Voltar' }));
+    expect(ui.getByText('Etapa 1 de 3')).toBeInTheDocument();
+    expect(ui.getByLabelText('Nome')).toHaveValue('Maria');
+    expect(ui.getByLabelText('E-mail')).toHaveValue('maria@example.com');
+    expect(ui.getByLabelText('Data de nascimento')).toHaveValue('1990-01-01');
+  });
+
+  test('bloqueia o avanço com erros específicos por campo na etapa atual', () => {
+    const { ui, register } = renderRegister();
+
+    // Etapa 1: e-mail inválido impede o avanço
+    fireEvent.change(ui.getByLabelText('Nome'), { target: { value: 'Maria' } });
+    fireEvent.change(ui.getByLabelText('E-mail'), { target: { value: 'email-invalido' } });
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+
+    expect(ui.getByText('Etapa 1 de 3')).toBeInTheDocument();
+    expect(ui.getByText('Informe um e-mail válido.')).toHaveAttribute('id', 'register-email-error');
+    expect(ui.getByLabelText('E-mail')).toHaveAttribute('aria-invalid', 'true');
+
+    // Corrige o e-mail e avança
+    fireEvent.change(ui.getByLabelText('E-mail'), { target: { value: 'maria@example.com' } });
+    fireEvent.change(ui.getByLabelText('Data de nascimento'), { target: { value: '1990-01-01' } });
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    expect(ui.getByText('Etapa 2 de 3')).toBeInTheDocument();
+
+    // Etapa 2: senhas divergentes bloqueiam o avanço
+    fireEvent.change(ui.getByLabelText('Senha'), { target: { value: 'senha-forte-1' } });
+    fireEvent.change(ui.getByLabelText('Confirmar senha'), { target: { value: 'outra-senha-1' } });
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+
+    expect(ui.getByText('Etapa 2 de 3')).toBeInTheDocument();
+    expect(ui.getByText('As senhas não coincidem.')).toHaveAttribute('id', 'register-confirm-error');
+
+    // A API não deve ser chamada enquanto o wizard não chega à etapa final
+    expect(register).not.toHaveBeenCalled();
+  });
+
+  test('etapa final exige aceite dos termos antes de chamar a API', () => {
+    const { ui, register } = renderRegister();
+
+    fillStep1(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    fillStep2(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+
+    expect(ui.getByText('Etapa 3 de 3')).toBeInTheDocument();
+    fireEvent.click(ui.getByRole('button', { name: 'Criar conta' }));
+
+    expect(ui.getByText('Você deve aceitar os Termos de Uso e a Política de Privacidade.')).toHaveAttribute('id', 'register-terms-error');
+    expect(register).not.toHaveBeenCalled();
+  });
+
+  test('submete na etapa final e exibe a tela de conta criada', async () => {
+    const register = vi.fn().mockResolvedValue({});
+    const { ui } = renderRegister(register);
+
+    fillStep1(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    fillStep2(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    fireEvent.click(ui.getByRole('checkbox'));
+    fireEvent.click(ui.getByRole('button', { name: 'Criar conta' }));
+
+    expect(await ui.findByText('Conta criada')).toBeInTheDocument();
+    expect(register).toHaveBeenCalledWith('Maria', 'maria@example.com', 'senha-forte-1', true, '1990-01-01');
+    expect(sessionStorage.getItem('mertilo_verification_email')).toBe('maria@example.com');
+  });
+
+  test('avançar para a etapa final não dispara submit acidental', () => {
+    const { ui, register } = renderRegister();
+
+    fillStep1(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    fillStep2(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+
+    // Ao chegar na etapa 3, nenhum erro de termos deve ter sido disparado pelo clique em "Continuar"
+    expect(ui.getByText('Etapa 3 de 3')).toBeInTheDocument();
+    expect(ui.queryByText('Você deve aceitar os Termos de Uso e a Política de Privacidade.')).not.toBeInTheDocument();
+    expect(register).not.toHaveBeenCalled();
+  });
+
   test('erros são específicos por campo, associados via ARIA e limpos ao corrigir', () => {
     const { ui, container } = renderRegister();
     const name = ui.getByLabelText('Nome');
@@ -534,37 +723,37 @@ describe('cadastro', () => {
 
     fireEvent.change(name, { target: { value: 'Maria' } });
     fireEvent.change(email, { target: { value: 'email-invalido' } });
-    fireEvent.change(ui.getByLabelText('Senha'), { target: { value: 'senha-forte-1' } });
-    fireEvent.change(ui.getByLabelText('Confirmar senha'), { target: { value: 'senha-forte-1' } });
-    fireEvent.submit(container.querySelector('form'));
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
 
     expect(email).toHaveAttribute('aria-invalid', 'true');
     expect(email).toHaveAttribute('aria-describedby', 'register-email-error');
     expect(ui.getByText('Informe um e-mail válido.')).toHaveAttribute('id', 'register-email-error');
     expect(name).toHaveAttribute('aria-invalid', 'false');
-    expect(birth).toHaveAttribute('aria-invalid', 'false');
-    expect(ui.getByLabelText('Senha')).toHaveAttribute('aria-invalid', 'false');
-
-    fireEvent.change(email, { target: { value: 'maria@example.com' } });
-    expect(email).toHaveAttribute('aria-invalid', 'false');
-    fireEvent.submit(container.querySelector('form'));
-
+    // Data de nascimento vazia também é sinalizada na etapa 1
     expect(birth).toHaveAttribute('aria-invalid', 'true');
     expect(birth.getAttribute('aria-describedby')).toBe('register-dateOfBirth-error adult-only-notice');
+
+    // Erros somem ao corrigir o campo
+    fireEvent.change(email, { target: { value: 'maria@example.com' } });
     expect(email).toHaveAttribute('aria-invalid', 'false');
+    fireEvent.change(birth, { target: { value: '1990-01-01' } });
+    expect(birth).toHaveAttribute('aria-invalid', 'false');
+
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    expect(ui.getByText('Etapa 2 de 3')).toBeInTheDocument();
+    expect(container).toBeTruthy();
   });
 
   test('erro geral da API não marca nenhum campo como inválido', async () => {
     const register = vi.fn().mockRejectedValue(new Error('Falha geral do servidor'));
     const { ui, container } = renderRegister(register);
 
-    fireEvent.change(ui.getByLabelText('Nome'), { target: { value: 'Maria' } });
-    fireEvent.change(ui.getByLabelText('E-mail'), { target: { value: 'maria@example.com' } });
-    fireEvent.change(ui.getByLabelText('Senha'), { target: { value: 'senha-forte-1' } });
-    fireEvent.change(ui.getByLabelText('Confirmar senha'), { target: { value: 'senha-forte-1' } });
-    fireEvent.change(ui.getByLabelText('Data de nascimento'), { target: { value: '1990-01-01' } });
+    fillStep1(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
+    fillStep2(ui);
+    fireEvent.click(ui.getByRole('button', { name: 'Continuar' }));
     fireEvent.click(ui.getByRole('checkbox'));
-    fireEvent.submit(container.querySelector('form'));
+    fireEvent.click(ui.getByRole('button', { name: 'Criar conta' }));
 
     expect(await ui.findByText('Falha geral do servidor')).toHaveAttribute('role', 'alert');
     expect(register).toHaveBeenCalledWith('Maria', 'maria@example.com', 'senha-forte-1', true, '1990-01-01');

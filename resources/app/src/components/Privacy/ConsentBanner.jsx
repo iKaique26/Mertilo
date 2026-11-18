@@ -3,7 +3,7 @@ import { usePrivacy } from '../../context/PrivacyContext';
 import { ShieldCheck, Settings2 } from 'lucide-react';
 
 export const ConsentBanner = () => {
-  const { showBanner, acceptAll, rejectAll, setShowModal } = usePrivacy();
+  const { showBanner, acceptAll, rejectAll, setShowModal, storageNotice } = usePrivacy();
 
   if (!showBanner) return null;
 
@@ -14,28 +14,33 @@ export const ConsentBanner = () => {
           <ShieldCheck className="consent-banner__icon" size={24} />
           <div className="consent-banner__text">
             <p>
-              Utilizamos armazenamento local para melhorar sua experiência e garantir a segurança.
-              Algumas tecnologias são essenciais para o funcionamento do Mertilo.
+              Utilizamos tecnologias de armazenamento para melhorar sua experiência e garantir a segurança. 
+              Algumas são essenciais para o funcionamento do Mertilo.
             </p>
+            {storageNotice && (
+              <p role="status" className="consent-banner__notice">
+                {storageNotice}
+              </p>
+            )}
           </div>
         </div>
         <div className="consent-banner__actions">
-          <button
-            className="btn btn-secondary btn-sm"
+          <button 
+            className="btn btn-secondary btn-sm" 
             onClick={() => setShowModal(true)}
             aria-label="Personalizar preferências de privacidade"
           >
             <Settings2 size={16} />
             <span>Personalizar</span>
           </button>
-          <button
-            className="btn btn-secondary btn-sm"
+          <button 
+            className="btn btn-secondary btn-sm" 
             onClick={rejectAll}
           >
             Recusar opcionais
           </button>
-          <button
-            className="btn btn-primary btn-sm"
+          <button 
+            className="btn btn-primary btn-sm" 
             onClick={acceptAll}
           >
             Aceitar todos
@@ -43,8 +48,7 @@ export const ConsentBanner = () => {
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{
-        __html: `
+      <style dangerouslySetInnerHTML={{ __html: `
         .consent-banner {
           position: fixed;
           bottom: 1.5rem;
@@ -92,6 +96,12 @@ export const ConsentBanner = () => {
           font-size: 0.9rem;
           color: var(--color-text-primary);
           line-height: 1.5;
+        }
+
+        .consent-banner__notice {
+          margin-top: 0.5rem !important;
+          color: var(--color-danger, #c0392b) !important;
+          font-weight: 600;
         }
 
         .consent-banner__actions {

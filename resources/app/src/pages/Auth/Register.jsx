@@ -32,8 +32,18 @@ export default function Register() {
   const [errors, setErrors] = useState({});
   // Flag de sucesso: quando true, renderiza a tela de "conta criada"
   const [success, setSuccess] = useState(false);
+  // Etapa atual do cadastro (1 = Seus dados, 2 = Segurança, 3 = Finalização)
+  const [step, setStep] = useState(1);
   // Controla a revelação do painel esquerdo (animação quando o usuário foca em algum campo)
   const [isRevealed, setIsRevealed] = useState(false);
+
+  // Rótulos e total de etapas do wizard
+  const STEPS = [
+    { id: 1, title: 'Seus dados', description: 'Nome, e-mail e data de nascimento' },
+    { id: 2, title: 'Segurança', description: 'Crie e confirme sua senha' },
+    { id: 3, title: 'Finalização', description: 'Revise e aceite os termos' },
+  ];
+  const TOTAL_STEPS = STEPS.length;
 
   // Focar em qualquer campo revela o painel visual esquerdo
   const handleFocus = () => setIsRevealed(true);
@@ -64,65 +74,81 @@ export default function Register() {
     <p id={`register-${field}-error`} className="login-panel__field-error" role="alert">{errors[field]}</p>
   );
 
-  // Função chamada ao submeter o formulário de registro
-  const handleSubmit = async (e) => {
-    // Previne recarregamento da página
-    e.preventDefault();
-    // Evita submit duplicado se já estiver carregando
-    if (loading) return;
-    // Limpa erros anteriores
-    setErrors({});
-
-    // Normaliza o e-mail (remove espaços, minúsculas)
-    const normalizedEmail = email.trim().toLowerCase();
-
-    // Validação 1: todos os campos obrigatórios preenchidos (cada campo vazio recebe a sua mensagem)
-    const missing = {};
-    if (!name.trim()) missing.name = 'Informe seu nome.';
-    if (!normalizedEmail) missing.email = 'Informe seu e-mail.';
-    if (!password) missing.password = 'Informe uma senha.';
-    if (!confirm) missing.confirm = 'Confirme sua senha.';
-    if (Object.keys(missing).length) {
-      setErrors(missing);
-      return;
-    }
-    // Validação 2: formato do e-mail (algo@algo.algo)
-    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      setErrors({ email: 'Informe um e-mail válido.' });
-      return;
-    }
-    // Validação 3: senha e confirmação coincidem
-    if (password !== confirm) {
-      setErrors({ confirm: 'As senhas não coincidem.' });
-      return;
-    }
-    // Validação 4: senha mínima de 8 caracteres
-    if (password.length < 8) {
-      setErrors({ password: 'A senha deve ter ao menos 8 caracteres.' });
-      return;
-    }
-    // Validação 5: data de nascimento informada
-    if (!dateOfBirth) {
-      setErrors({ dateOfBirth: 'Informe sua data de nascimento. O Mertilo é exclusivo para maiores de 18 anos.' });
-      return;
-    }
-    // Cálculo da idade a partir da data de nascimento (com fuso tratado via "T00:00:00")
-    const birthDate = new Date(`${dateOfBirth}T00:00:00`);
+  // Calcula a idade a partir da data de nascimento (com fuso tratado via "T00:00:00")
+  const ageFrom = (dob) => {
+    const birthDate = new Date(`${dob}T00:00:00`);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     // Ajusta a idade se o aniversário ainda não ocorreu este ano
     const monthDiff = today.getMonth() - birthDate.getMonth();
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
-    // Validação 6: precisa ser maior de 18 anos
-    if (age < 18) {
-      setErrors({ dateOfBirth: 'O Mertilo é exclusivo para maiores de 18 anos.' });
+    return age;
+  };
+
+  // Valida a etapa 1 (Seus dados): nome, e-mail e data de nascimento / maioridade
+  const validateStep1 = () => {
+    const next = {};
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!name.trim()) next.name = 'Informe seu nome.';
+    if (!normalizedEmail) next.email = 'Informe seu e-mail.';
+    else if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) next.email = 'Informe um e-mail válido.';
+    if (!dateOfBirth) next.dateOfBirth = 'Informe sua data de nascimento. O Mertilo é exclusivo para maiores de 18 anos.';
+    else if (ageFrom(dateOfBirth) < 18) next.dateOfBirth = 'O Mertilo é exclusivo para maiores de 18 anos.';
+    return next;
+  };
+
+  // Valida a etapa 2 (Segurança): senha e confirmação
+  const validateStep2 = () => {
+    const next = {};
+    if (!password) next.password = 'Informe uma senha.';
+    else if (password.length < 8) next.password = 'A senha deve ter ao menos 8 caracteres.';
+    if (!confirm) next.confirm = 'Confirme sua senha.';
+    else if (password !== confirm) next.confirm = 'As senhas não coincidem.';
+    return next;
+  };
+
+  // Valida a etapa 3 (Finalização): aceite dos termos
+  const validateStep3 = () => {
+    if (!acceptTerms) return { terms: 'Você deve aceitar os Termos de Uso e a Política de Privacidade.' };
+    return {};
+  };
+
+  // Avança para a próxima etapa validando os campos da etapa atual
+  const handleNext = (e) => {
+    // Bloqueia o submit nativo: o botão da etapa final herdaria o clique
+    e?.preventDefault();
+    const stepErrors = step === 1 ? validateStep1() : step === 2 ? validateStep2() : validateStep3();
+    setErrors(stepErrors);
+    if (Object.keys(stepErrors).length) return;
+    setStep((s) => Math.min(s + 1, TOTAL_STEPS));
+  };
+
+  // Volta para a etapa anterior preservando os dados preenchidos
+  const handleBack = () => {
+    setErrors({});
+    setStep((s) => Math.max(s - 1, 1));
+  };
+
+  // Função chamada ao submeter o formulário de registro (etapa final)
+  const handleSubmit = async (e) => {
+    // Previne recarregamento da página
+    e.preventDefault();
+    // Evita submit duplicado se já estiver carregando
+    if (loading) return;
+
+    // Valida todas as etapas antes de chamar a API (garante que nada foi perdido ao navegar)
+    const allErrors = { ...validateStep1(), ...validateStep2(), ...validateStep3() };
+    if (Object.keys(allErrors).length) {
+      setErrors(allErrors);
+      // Leva o usuário à primeira etapa com erro
+      if (allErrors.name || allErrors.email || allErrors.dateOfBirth) setStep(1);
+      else if (allErrors.password || allErrors.confirm) setStep(2);
+      else setStep(3);
       return;
     }
-    // Validação 7: aceite dos termos obrigatório
-    if (!acceptTerms) {
-      setErrors({ terms: 'Você deve aceitar os Termos de Uso e a Política de Privacidade.' });
-      return;
-    }
+
+    // Normaliza o e-mail (remove espaços, minúsculas)
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Ativa loading enquanto o registro está em andamento
     setLoading(true);
@@ -249,8 +275,32 @@ export default function Register() {
             <h2 id="register-title">Registrar-se</h2>
             <p>Preencha os dados para criar sua conta Mertilo</p>
           </div>
+
+          {/* Indicador de progresso: "N de 3" + barra com as 3 etapas */}
+          <div className="register-steps" role="group" aria-label={`Etapa ${step} de ${TOTAL_STEPS}`}>
+            <p className="register-steps__counter">
+              <strong>Etapa {step} de {TOTAL_STEPS}</strong>
+              <span> — {STEPS[step - 1].title}</span>
+            </p>
+            <ol className="register-steps__list">
+              {STEPS.map((s) => (
+                <li
+                  key={s.id}
+                  className={`register-steps__item ${s.id === step ? 'is-current' : ''} ${s.id < step ? 'is-done' : ''}`}
+                  aria-current={s.id === step ? 'step' : undefined}
+                >
+                  <span className="register-steps__dot">{s.id < step ? '✓' : s.id}</span>
+                  <span className="register-steps__label">{s.title}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
           {/* Formulário com submit handler; noValidate desliga validação nativa */}
           <form onSubmit={handleSubmit} aria-label="register-form" noValidate>
+            {/* ETAPA 1 — Seus dados */}
+            {step === 1 && (
+              <>
             {/* Campo: Nome */}
             <div className="login-field">
               <label htmlFor="register-name">Nome</label>
@@ -326,7 +376,12 @@ export default function Register() {
               {/* Aviso de restrição de idade */}
               <small id="adult-only-notice" className="login-field__note">Cadastro exclusivo para maiores de 18 anos.</small>
             </div>
+              </>
+            )}
 
+            {/* ETAPA 2 — Segurança */}
+            {step === 2 && (
+              <>
             {/* Campo: Senha */}
             <div className="login-field">
               <label htmlFor="register-password">Senha</label>
@@ -398,7 +453,27 @@ export default function Register() {
               {/* Feedback imediato: mostra "Senhas coincidem" só quando confirm igual a password e ambos preenchidos */}
               {confirm && password === confirm && <p id="register-password-match" className="login-panel__field-hint">Senhas coincidem</p>}
             </div>
+              </>
+            )}
 
+            {/* ETAPA 3 — Finalização */}
+            {step === 3 && (
+              <>
+              {/* Resumo dos dados informados nas etapas anteriores (somente leitura) */}
+              <dl className="register-summary">
+                <div className="register-summary__row">
+                  <dt>Nome</dt>
+                  <dd>{name.trim()}</dd>
+                </div>
+                <div className="register-summary__row">
+                  <dt>E-mail</dt>
+                  <dd>{email.trim().toLowerCase()}</dd>
+                </div>
+                <div className="register-summary__row">
+                  <dt>Data de nascimento</dt>
+                  <dd>{dateOfBirth}</dd>
+                </div>
+              </dl>
             {/* Checkbox de aceite dos Termos de Uso e Política de Privacidade */}
             <div className="login-field-checkbox">
               <input
@@ -417,14 +492,35 @@ export default function Register() {
               </label>
             </div>
             {fieldError('terms')}
+              </>
+            )}
 
             {/* Erro geral (ex.: resposta da API sem campo associado). role="alert" para leitores de tela. */}
             {errors.form && <div id="register-form-error" className="login-panel__error" role="alert">{errors.form}</div>}
 
-            {/* Botão de submit: desabilitado em loading; mostra spinner ou texto "Criar conta" */}
-            <button className="login-panel__submit" type="submit" disabled={loading} aria-disabled={loading}>
-              {loading ? <span className="login-panel__spinner" /> : 'Criar conta'}
-            </button>
+            {/* Navegação entre etapas */}
+            <div className="register-nav">
+              {/* Botão Voltar: visível apenas a partir da etapa 2 */}
+              {step > 1 && (
+                <button className="register-nav__back" type="button" onClick={handleBack}>
+                  Voltar
+                </button>
+              )}
+
+              {/* Botão Continuar: valida a etapa atual e avança (não submete).
+                  key distinta garante que o React crie um nó DOM novo no último passo,
+                  evitando que o botão clicado vire o submit da etapa final. */}
+              {step < TOTAL_STEPS ? (
+                <button key={`next-${step}`} className="login-panel__submit register-nav__next" type="button" onClick={handleNext}>
+                  Continuar
+                </button>
+              ) : (
+                /* Botão de submit na etapa final: desabilitado em loading; mostra spinner ou texto "Criar conta" */
+                <button key={`submit-${step}`} className="login-panel__submit register-nav__next" type="submit" disabled={loading} aria-disabled={loading}>
+                  {loading ? <span className="login-panel__spinner" /> : 'Criar conta'}
+                </button>
+              )}
+            </div>
           </form>
           {/* Rodapé: link para login caso já tenha conta */}
           <p className="login-panel__signup">

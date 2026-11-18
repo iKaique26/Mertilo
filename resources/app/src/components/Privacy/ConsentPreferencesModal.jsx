@@ -95,7 +95,7 @@ export const ConsentPreferencesModal = () => {
 
         <div className="privacy-modal__content">
           <p id="privacy-modal-description" className="privacy-modal__intro">
-            Gerencie como o Mertilo utiliza o armazenamento local neste dispositivo. Respeitamos sua privacidade e seguimos as diretrizes da LGPD.
+            Gerencie como o Mertilo utiliza o armazenamento do seu navegador. Respeitamos sua privacidade e seguimos as diretrizes da LGPD.
           </p>
 
           {storageNotice && (
@@ -124,7 +124,7 @@ export const ConsentPreferencesModal = () => {
                 <Settings size={18} />
                 <span>Preferências Funcionais</span>
               </div>
-              <p>Permitem que o site lembre suas escolhas, como o período selecionado no dashboard e configurações de interface.</p>
+              <p>Permitem que o site lembre suas escolhas, como o período selecionado no dashboard e configurações de interface. As escolhas ficam salvas apenas neste navegador e não são sincronizadas entre dispositivos.</p>
             </div>
             <div className="privacy-option__toggle">
               <label className="switch">

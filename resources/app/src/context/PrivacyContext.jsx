@@ -1,10 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { AuthContext } from './AuthContext';
+import legalDocuments from '../../shared/legal-documents.json';
 
 export const PRIVACY_STORAGE_KEY = 'mertilo_privacy_consent';
 export const CONSENT_SCHEMA_VERSION = '1.0.0';
-export const PRIVACY_POLICY_VERSION = '1.1.0';
-export const TERMS_OF_USE_VERSION = '1.1.0';
+export const PRIVACY_POLICY_VERSION = legalDocuments.privacy.version;
+export const TERMS_OF_USE_VERSION = legalDocuments.terms.version;
 
 const DEFAULT_PREFERENCES = {
   necessary: true,
@@ -66,10 +67,16 @@ const normalizeConsentRecord = (value) => {
     return null;
   }
 
+  const policyVersion = value.policyVersion;
+  if (policyVersion !== PRIVACY_POLICY_VERSION) {
+    return null;
+  }
+
   const preferences = normalizePreferences(value.preferences || {});
 
   return {
     version: CONSENT_SCHEMA_VERSION,
+    policyVersion: PRIVACY_POLICY_VERSION,
     timestamp: typeof value.timestamp === 'string' ? value.timestamp : new Date().toISOString(),
     preferences,
   };
@@ -91,6 +98,7 @@ const parseConsentFromStorageValue = (rawValue) => {
 
 const buildConsentRecord = (preferences = {}) => ({
   version: CONSENT_SCHEMA_VERSION,
+  policyVersion: PRIVACY_POLICY_VERSION,
   timestamp: new Date().toISOString(),
   preferences: normalizePreferences({
     ...DEFAULT_PREFERENCES,
@@ -183,12 +191,12 @@ export const PrivacyProvider = ({ children }) => {
   const rejectAll = useCallback(() => saveConsent({ functional: false, analytics: false, marketing: false }), [saveConsent]);
   const functionalEnabled = consent?.preferences.functional === true;
   const getFunctionalValue = useCallback((key, fallback = null) => {
-    const scopedKey = userId ? `${key}:${userId}` : key;
-    return functionalEnabled ? (safeStorageGet(scopedKey) ?? fallback) : fallback;
+    if (!userId || !functionalEnabled) return fallback;
+    return safeStorageGet(`${key}:${userId}`) ?? fallback;
   }, [functionalEnabled, userId]);
   const setFunctionalValue = useCallback((key, value) => {
-    const scopedKey = userId ? `${key}:${userId}` : key;
-    return functionalEnabled && safeStorageSet(scopedKey, value);
+    if (!userId || !functionalEnabled) return false;
+    return safeStorageSet(`${key}:${userId}`, value);
   }, [functionalEnabled, userId]);
   return (
     <PrivacyContext.Provider
