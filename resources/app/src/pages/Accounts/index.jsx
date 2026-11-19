@@ -340,6 +340,7 @@ export function Accounts() {
                       title="Excluir conta"
                       aria-label={`Excluir conta ${account.nome}`}
                       onClick={() => setDeleting(account)}
+                      disabled={deleteBusy}
                     >
                       <Trash2 size={16} strokeWidth={2} />
                     </button>
