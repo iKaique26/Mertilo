@@ -1,24 +1,79 @@
 import { readUserData, writeUserData } from '../data/store.js';
 import { exercisesRepository } from '../modules/irpf/repositories/exercise.repository.js';
 import { incomeRepository } from '../modules/irpf/repositories/income.repository.js';
+import { getDatabase } from '../database/db.js';
 
-function syncIncomeToIrpf(records: ImportRecord[], userId: string): void {
-  for (const record of records.filter((item) => item.type === 'entrada' && /sal[aá]rio|holerite|remunera[cç][aã]o/i.test(`${item.category} ${item.description}`))) {
-    const year = Number(record.date.slice(0, 4));
-    const month = Number(record.date.slice(5, 7));
-    if (!year || !month) continue;
-    let exercise = exercisesRepository.getByYear(year, userId);
-    if (!exercise) {
-      try {
-        exercise = exercisesRepository.create(year, userId);
-      } catch (error: any) {
-        if (error?.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw error;
-        return;
+export function sanitizeCsvFormula(value: string | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/^[\s\t\r\n]*[=+\-@|%]/.test(str)) {
+    return `'${str}`;
+  }
+  return str;
+}
+
+export function exportCsvRow(fields: Array<string | number | null | undefined>): string {
+  return fields
+    .map((val) => {
+      if (typeof val === 'number') {
+        return Number.isFinite(val) ? String(val) : '';
       }
+      const sanitized = sanitizeCsvFormula(val);
+      if (sanitized.includes('"') || sanitized.includes(',') || sanitized.includes(';') || sanitized.includes('\n') || sanitized.includes('\r')) {
+        return `"${sanitized.replace(/"/g, '""')}"`;
+      }
+      return sanitized;
+    })
+    .join(';');
+}
+
+function syncIncomeToIrpf(records: ImportRecord[], userId: string): string[] {
+  const createdIncomeIds: string[] = [];
+  const exerciseIdsCreatedBySync: string[] = [];
+  try {
+    for (const record of records.filter((item) => item.type === 'entrada' && /sal[aá]rio|holerite|remunera[cç][aã]o/i.test(`${item.category} ${item.description}`))) {
+      const year = Number(record.date.slice(0, 4));
+      const month = Number(record.date.slice(5, 7));
+      if (!year || !month) continue;
+      let exercise = exercisesRepository.getByYear(year, userId);
+      if (!exercise) {
+        try {
+          exercise = exercisesRepository.create(year, userId);
+          exerciseIdsCreatedBySync.push(exercise.id);
+        } catch (error: any) {
+          if (error?.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw error;
+          exercise = exercisesRepository.getByYear(year, userId);
+          if (!exercise) throw error;
+        }
+      }
+      const source = `financial-import:${record.id}`;
+      if (incomeRepository.getAll(exercise.id, userId).some((income) => income.source === source)) continue;
+      const created = incomeRepository.create(exercise.id, {
+        exercise_id: exercise.id,
+        income_type: 'salary',
+        description: record.description,
+        amount: Number(record.value) || 0,
+        month,
+        source,
+        confidence_score: record.confidence || 100,
+        is_verified: false,
+      });
+      createdIncomeIds.push(created.id);
     }
-    const source = `financial-import:${record.id}`;
-    if (incomeRepository.getAll(exercise.id, userId).some((income) => income.source === source)) continue;
-    incomeRepository.create(exercise.id, { exercise_id: exercise.id, income_type: 'salary', description: record.description, amount: Number(record.value) || 0, month, source, confidence_score: record.confidence || 100, is_verified: false });
+    return createdIncomeIds;
+  } catch (syncError) {
+    for (const incomeId of createdIncomeIds) {
+      try { incomeRepository.delete(incomeId, userId); } catch { /* ignore rollback error */ }
+    }
+    for (const exerciseId of exerciseIdsCreatedBySync) {
+      try {
+        const remainingIncomes = incomeRepository.getAll(exerciseId, userId);
+        if (remainingIncomes.length === 0) {
+          exercisesRepository.delete(exerciseId, userId);
+        }
+      } catch { /* ignore rollback error */ }
+    }
+    throw syncError;
   }
 }
 
@@ -644,6 +699,7 @@ export function undoCsvImport(userId: string | undefined, importId: string): { o
 export function confirmCsvImport(payload: { userId?: string; records: ImportRecord[]; fileName?: string }): { ok: boolean; importedCount: number; historyId: string; summary: { total: number; imported: number; duplicates: number; invalid: number; toReview: number }; } {
   const ownerId = requireUserId(payload.userId);
   const data = readUserData(ownerId);
+  const backupData = JSON.parse(JSON.stringify(data));
   const records = Array.isArray(payload.records) ? payload.records : [];
   const validRecords = records.filter((record) => !record.potentialDuplicate && !record.manualReview && !!record.date && Number.isFinite(record.value));
 
@@ -680,8 +736,20 @@ export function confirmCsvImport(payload: { userId?: string; records: ImportReco
   data.importHistory = [importBatch, ...existingImports];
   data.importedTransactions = importedTransactions;
   rebuildImportedMonthHistory(data, ownerId);
-  writeUserData(ownerId, data);
-  syncIncomeToIrpf(ownerRecords, ownerId);
+
+  let syncedIncomes: string[] = [];
+  try {
+    writeUserData(ownerId, data);
+    syncedIncomes = syncIncomeToIrpf(ownerRecords, ownerId);
+  } catch (error) {
+    try {
+      writeUserData(ownerId, backupData);
+    } catch { /* ignore rollback write error */ }
+    for (const incomeId of syncedIncomes) {
+      try { incomeRepository.delete(incomeId, ownerId); } catch { /* ignore rollback delete error */ }
+    }
+    throw error;
+  }
 
   return {
     ok: true,

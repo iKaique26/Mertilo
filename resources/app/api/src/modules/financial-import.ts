@@ -12,8 +12,13 @@ router.post('/preview', (req, res) => {
       return res.status(400).json({ error: 'CSV vazio ou inexistente.' });
     }
 
+    const authUserId = (req as any).user?.id;
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Contexto de usuário obrigatório.' });
+    }
+
     const result = parseCsvPreview(csvText, {
-      userId: (req as any).user?.id,
+      userId: authUserId,
       fileName: typeof fileName === 'string' ? fileName : 'importacao.csv',
       mapping,
     });
@@ -32,7 +37,12 @@ router.post('/confirm', (req, res) => {
       return res.status(400).json({ error: 'Nenhuma transação válida para importar.' });
     }
 
-    const result = confirmCsvImport({ userId: (req as any).user?.id, records, fileName });
+    const authUserId = (req as any).user?.id;
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Contexto de usuário obrigatório.' });
+    }
+
+    const result = confirmCsvImport({ userId: authUserId, records, fileName });
     return res.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao confirmar importação.';
@@ -42,7 +52,11 @@ router.post('/confirm', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
-    const result = undoCsvImport((req as any).user?.id, req.params.id);
+    const authUserId = (req as any).user?.id;
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Contexto de usuário obrigatório.' });
+    }
+    const result = undoCsvImport(authUserId, req.params.id);
     if (!result.ok) {
       return res.status(404).json({ error: result.reason || 'Importação não encontrada.' });
     }
@@ -55,7 +69,11 @@ router.delete('/:id', (req, res) => {
 
 router.delete('/transaction/:transactionId', (req, res) => {
   try {
-    const result = deleteImportedTransaction((req as any).user?.id, req.params.transactionId);
+    const authUserId = (req as any).user?.id;
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Contexto de usuário obrigatório.' });
+    }
+    const result = deleteImportedTransaction(authUserId, req.params.transactionId);
     if (!result.ok) {
       return res.status(404).json({ error: result.reason || 'Transação não encontrada.' });
     }

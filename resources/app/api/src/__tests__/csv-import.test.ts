@@ -12,7 +12,7 @@ process.env.MERTILO_DATA_DIR = TEST_DIR;
 process.env.MERTILO_DB_PATH = path.join(TEST_DIR, 'mertilo.db');
 
 const { readUserData, writeUserData } = await import('../data/store.js');
-const { confirmCsvImport, parseCsvPreview, undoCsvImport, deleteImportedTransaction } = await import('../services/csv-import.service.js');
+const { confirmCsvImport, parseCsvPreview, undoCsvImport, deleteImportedTransaction, sanitizeCsvFormula, exportCsvRow } = await import('../services/csv-import.service.js');
 const { exercisesRepository, documentsRepository, incomeRepository } = await import('../repositories/irpf.repository.js');
 const { irpfService } = await import('../services/irpf.service.js');
 const { initializeDatabase, shutdownDatabase } = await import('../database/index.js');
@@ -247,4 +247,112 @@ test('deleteDocument remove arquivo físico e registros relacionados do IRPF', a
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('V-002: sanitizeCsvFormula neutraliza fórmulas sem afetar números negativos', () => {
+  assert.equal(sanitizeCsvFormula('=1+1'), "'=1+1");
+  assert.equal(sanitizeCsvFormula('+cmd|'), "'+cmd|");
+  assert.equal(sanitizeCsvFormula('-2+3'), "'-2+3");
+  assert.equal(sanitizeCsvFormula('@SUM(A1)'), "'@SUM(A1)");
+  assert.equal(sanitizeCsvFormula('\t=cmd'), "'\t=cmd");
+  assert.equal(sanitizeCsvFormula('  -calc'), "'  -calc");
+  assert.equal(sanitizeCsvFormula('Mercado Normal'), 'Mercado Normal');
+
+  // Valores numéricos legítimos em exportCsvRow
+  const rowNegative = exportCsvRow(['2026-08-01', 'Supermercado', -120.45]);
+  assert.equal(rowNegative, '2026-08-01;Supermercado;-120.45');
+
+  // Texto perigoso em exportCsvRow
+  const rowDangerous = exportCsvRow(['2026-08-01', '=cmd|calc', 100]);
+  assert.equal(rowDangerous, '2026-08-01;\'=cmd|calc;100');
+});
+
+test('V-004 e V-006: isolamento estrito de usuário e atomicidade/rollback no import', () => {
+  resetData();
+  writeUserData('user-b', {
+    salario: 0,
+    contas: [],
+    categorias: [],
+    historico: [],
+    vexpenses: [],
+    importHistory: [],
+    importedTransactions: [],
+  });
+
+  // V-004: Tentativa de injetar userId 'user-b' pelo payload é ignorada/sobrescrita pelo auth context 'user-a'
+  const result = confirmCsvImport({
+    userId: 'user-a',
+    fileName: 'spoof.csv',
+    records: [
+      {
+        userId: 'user-b', // Spoofed ID
+        id: 'spoof-1',
+        date: '2026-08-01',
+        description: 'Salário Fictício',
+        normalizedDescription: 'salario ficticio',
+        originalDescription: 'Salário Fictício',
+        value: 5000,
+        type: 'entrada',
+        category: 'Salário e outras receitas',
+        subcategory: 'Salário',
+        confidence: 0.95,
+        source: 'spoof.csv',
+        status: 'importado',
+        line: 2,
+        importSource: 'csv_import',
+        importedAt: '2026-08-01T00:00:00.000Z',
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  const dataA = readUserData('user-a');
+  const dataB = readUserData('user-b');
+
+  // Usuário A possui a transação com userId garantido
+  assert.equal(dataA.importedTransactions.length, 1);
+  assert.equal(dataA.importedTransactions[0].userId, 'user-a');
+
+  // Usuário B não recebeu nada (isolamento total)
+  assert.equal(dataB.importedTransactions.length, 0);
+
+  // V-006: Se syncIncomeToIrpf falhar, o estado no data.json e banco é revertido atomicamente
+  const previousA = JSON.parse(JSON.stringify(readUserData('user-a')));
+  
+  // Forçar falha no sync passando ano com erro de integridade ou mock de throw
+  const badRecord = {
+    userId: 'user-a',
+    id: 'err-1',
+    date: '2026-08-01',
+    description: 'Salário Erro',
+    normalizedDescription: 'salario erro',
+    originalDescription: 'Salário Erro',
+    value: 1000,
+    type: 'entrada' as const,
+    category: 'Salário e outras receitas',
+    subcategory: 'Salário',
+    confidence: 0.95,
+    source: 'fail.csv',
+    status: 'importado' as const,
+    line: 2,
+    importSource: 'csv_import',
+    importedAt: '2026-08-01T00:00:00.000Z',
+  };
+
+  const origGetAll = incomeRepository.getAll;
+  (incomeRepository as any).getAll = () => { throw new Error('Simulated DB failure during income sync'); };
+
+  try {
+    assert.throws(
+      () => confirmCsvImport({ userId: 'user-a', fileName: 'fail.csv', records: [badRecord] }),
+      /Simulated DB failure/
+    );
+  } finally {
+    incomeRepository.getAll = origGetAll;
+  }
+
+  // Verificar que data.json do user-a foi revertido ao estado anterior (sem registros parciais)
+  const revertedA = readUserData('user-a');
+  assert.equal(revertedA.importedTransactions.length, previousA.importedTransactions.length);
+  assert.equal(revertedA.importHistory.length, previousA.importHistory.length);
 });
