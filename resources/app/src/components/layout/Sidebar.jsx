@@ -50,9 +50,9 @@ export function Sidebar() {
     },
     {
       path: '/importacao-financeira',
-      label: 'Importação Financeira',
+      label: 'Importação e Exportação',
       Icon: Upload,
-      ariaLabel: 'Ir para Importação Financeira',
+      ariaLabel: 'Ir para Importação e Exportação de CSV',
     },
     {
       path: '/irpf',

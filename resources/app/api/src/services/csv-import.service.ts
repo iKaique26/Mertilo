@@ -1,4 +1,5 @@
-import { readUserData, writeUserData } from '../data/store.js';
+import { readUserData, updateUserData, withStorageLock, writeUserData } from '../data/store.js';
+import { detectEncoding, detectDelimiter, detectHeaderRow, detectDateFormat, parseMonetary } from '../utils/csvDetection.js';
 import { exercisesRepository } from '../modules/irpf/repositories/exercise.repository.js';
 import { incomeRepository } from '../modules/irpf/repositories/income.repository.js';
 import { getDatabase } from '../database/db.js';
@@ -41,8 +42,8 @@ function syncIncomeToIrpf(records: ImportRecord[], userId: string): string[] {
           exercise = exercisesRepository.create(year, userId);
           exerciseIdsCreatedBySync.push(exercise.id);
         } catch (error: any) {
-          if (error?.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw error;
-          exercise = exercisesRepository.getByYear(year, userId);
+          if (error?.code !== 'SQLITE_CONSTRAINT_UNIQUE' && !String(error?.message || '').includes('UNIQUE constraint failed')) throw error;
+          exercise = exercisesRepository.getByYear(year, userId) || exercisesRepository.getByYear(year);
           if (!exercise) throw error;
         }
       }
@@ -458,7 +459,8 @@ export function parseCsvPreview(rawCsv: string, options: { userId?: string; file
 
   const delimiter = detectDelimiter(text);
   const rows = parseCsvRows(text, delimiter);
-  if (rows.length < 2) {
+  const headerIdx = detectHeaderRow(rows);
+  if (headerIdx === -1 || rows.length < headerIdx + 2) {
     return {
       headers: [],
       suggestedMapping: {},
@@ -467,8 +469,7 @@ export function parseCsvPreview(rawCsv: string, options: { userId?: string; file
       errors: [{ line: 1, message: 'CSV sem cabeçalho ou sem linhas válidas.' }],
     };
   }
-
-  const rawHeaders = rows[0].map((header) => header.trim());
+  const rawHeaders = rows[headerIdx].map((header) => header.trim());
   const headers = rawHeaders.filter((_, index) => index < rawHeaders.length);
   const suggestedMapping = { ...buildSuggestedMapping(headers), ...(options.mapping || {}) };
   const allRecords: ImportRecord[] = [];
@@ -483,7 +484,7 @@ export function parseCsvPreview(rawCsv: string, options: { userId?: string; file
     seenHashes.set(matchKey, (seenHashes.get(matchKey) || 0) + 1);
   }
 
-  for (let i = 1; i < rows.length; i += 1) {
+  for (let i = headerIdx + 1; i < rows.length; i += 1) {
     const row = rows[i];
     const recordMap: Record<string, string> = {};
     for (let col = 0; col < headers.length; col += 1) {
@@ -501,7 +502,7 @@ export function parseCsvPreview(rawCsv: string, options: { userId?: string; file
     const normalizedDescription = descriptionText || 'Movimentação sem descrição';
 
     if (!parsedDate || !normalizedDescription || value === null) {
-      errors.push({ line: i + 1, message: 'Linha inválida: data, descrição ou valor não puderam ser identificados.' });
+      errors.push({ line: lineNumber, message: 'Linha inválida: data, descrição ou valor não puderam ser identificados.' });
       continue;
     }
 
@@ -645,68 +646,65 @@ export function rebuildImportedMonthHistory(data: any, userId?: string): void {
 
 export function deleteImportedTransaction(userId: string | undefined, transactionId: string): { ok: boolean; removed: boolean; transactionId?: string; reason?: string } {
   const ownerId = requireUserId(userId);
-  const data = readUserData(ownerId);
-  const currentTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions : [];
-  const target = currentTransactions.find((record: any) => record.id === transactionId && record.userId === ownerId);
+  return updateUserData<{ ok: boolean; removed: boolean; transactionId?: string; reason?: string }>(ownerId, (data) => {
+    const currentTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions : [];
+    const target = currentTransactions.find((record: any) => record.id === transactionId && record.userId === ownerId);
 
-  if (!target) {
-    return { ok: false, removed: false, reason: 'Transação não encontrada' };
-  }
+    if (!target) {
+      return { data, result: { ok: false, removed: false, reason: 'Transação não encontrada' } };
+    }
 
-  data.importedTransactions = currentTransactions.filter((record: any) => !(record.id === transactionId && record.userId === ownerId));
-  data.importHistory = Array.isArray(data.importHistory) ? data.importHistory.map((batch: any) => {
-    const nextTransactions = Array.isArray(batch.transactions) ? batch.transactions.filter((record: any) => record.id !== transactionId) : [];
-    const summary = batch.summary || { total: 0, imported: 0, duplicates: 0, invalid: 0, toReview: 0 };
-    return {
-      ...batch,
-      summary: {
-        ...summary,
-        total: Math.max(0, nextTransactions.length),
-        imported: nextTransactions.filter((record: any) => !record.potentialDuplicate && !record.manualReview).length,
-        duplicates: nextTransactions.filter((record: any) => record.potentialDuplicate).length,
-        toReview: nextTransactions.filter((record: any) => record.manualReview).length,
-      },
-      transactions: nextTransactions,
-    };
-  }) : [];
+    data.importedTransactions = currentTransactions.filter((record: any) => !(record.id === transactionId && record.userId === ownerId));
+    data.importHistory = Array.isArray(data.importHistory) ? data.importHistory.map((batch: any) => {
+      const nextTransactions = Array.isArray(batch.transactions) ? batch.transactions.filter((record: any) => record.id !== transactionId) : [];
+      const summary = batch.summary || { total: 0, imported: 0, duplicates: 0, invalid: 0, toReview: 0 };
+      return {
+        ...batch,
+        summary: {
+          ...summary,
+          total: Math.max(0, nextTransactions.length),
+          imported: nextTransactions.filter((record: any) => !record.potentialDuplicate && !record.manualReview).length,
+          duplicates: nextTransactions.filter((record: any) => record.potentialDuplicate).length,
+          toReview: nextTransactions.filter((record: any) => record.manualReview).length,
+        },
+        transactions: nextTransactions,
+      };
+    }) : [];
 
-  rebuildImportedMonthHistory(data, ownerId);
-  writeUserData(ownerId, data);
-
-  return { ok: true, removed: true, transactionId };
+    rebuildImportedMonthHistory(data, ownerId);
+    return { data, result: { ok: true, removed: true, transactionId } };
+  });
 }
 
 export function undoCsvImport(userId: string | undefined, importId: string): { ok: boolean; revertedCount: number; importId?: string; reason?: string } {
   const ownerId = requireUserId(userId);
-  const data = readUserData(ownerId);
-  const currentImports = Array.isArray(data.importHistory) ? data.importHistory : [];
-  const batch = currentImports.find((entry: any) => entry.id === importId && entry.userId === ownerId);
+  return updateUserData<{ ok: boolean; revertedCount: number; importId?: string; reason?: string }>(ownerId, (data) => {
+    const currentImports = Array.isArray(data.importHistory) ? data.importHistory : [];
+    const batch = currentImports.find((entry: any) => entry.id === importId && entry.userId === ownerId);
 
-  if (!batch) {
-    return { ok: false, revertedCount: 0, reason: 'Importação não encontrada' };
-  }
+    if (!batch) {
+      return { data, result: { ok: false, revertedCount: 0, reason: 'Importação não encontrada' } };
+    }
 
-  const removedIds = new Set((Array.isArray(batch.transactions) ? batch.transactions : []).map((record: any) => record.id));
-  data.importHistory = currentImports.filter((entry: any) => !(entry.id === importId && entry.userId === ownerId));
-  data.importedTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions.filter((record: any) => !(removedIds.has(record.id) && record.userId === ownerId)) : [];
+    const removedIds = new Set((Array.isArray(batch.transactions) ? batch.transactions : []).map((record: any) => record.id));
+    data.importHistory = currentImports.filter((entry: any) => !(entry.id === importId && entry.userId === ownerId));
+    data.importedTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions.filter((record: any) => !(removedIds.has(record.id) && record.userId === ownerId)) : [];
 
-  rebuildImportedMonthHistory(data, ownerId);
-  writeUserData(ownerId, data);
-
-  return { ok: true, revertedCount: removedIds.size, importId };
+    rebuildImportedMonthHistory(data, ownerId);
+    return { data, result: { ok: true, revertedCount: removedIds.size, importId } };
+  });
 }
 
 export function confirmCsvImport(payload: { userId?: string; records: ImportRecord[]; fileName?: string }): { ok: boolean; importedCount: number; historyId: string; summary: { total: number; imported: number; duplicates: number; invalid: number; toReview: number }; } {
   const ownerId = requireUserId(payload.userId);
-  const data = readUserData(ownerId);
-  const backupData = JSON.parse(JSON.stringify(data));
   const records = Array.isArray(payload.records) ? payload.records : [];
   const validRecords = records.filter((record) => !record.potentialDuplicate && !record.manualReview && !!record.date && Number.isFinite(record.value));
 
   const ownerRecords = validRecords.map((record) => ({ ...record, userId: ownerId }));
+  const importBatchId = `import-${Date.now()}`;
   const importBatch = {
     userId: ownerId,
-    id: `import-${Date.now()}`,
+    id: importBatchId,
     fileName: payload.fileName || 'importacao.csv',
     importedAt: new Date().toISOString(),
     summary: {
@@ -719,32 +717,44 @@ export function confirmCsvImport(payload: { userId?: string; records: ImportReco
     transactions: ownerRecords,
   };
 
-  const existingImports = Array.isArray(data.importHistory) ? data.importHistory : [];
-  const existingTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions : [];
-
-  for (const record of validRecords) {
-    ensureCategory(data, record.category, ownerId);
-  }
-
-  const importedTransactions = [...existingTransactions, ...ownerRecords.map((record) => ({
+  const newTransactions = ownerRecords.map((record) => ({
     ...record,
     userId: ownerId,
     value: Number(record.value.toFixed(2)),
     duplicateHash: record.duplicateHash || buildDuplicateHash(record as any),
-  }))];
+  }));
+  const newTransactionIds = new Set(newTransactions.map((tx) => tx.id));
 
-  data.importHistory = [importBatch, ...existingImports];
-  data.importedTransactions = importedTransactions;
-  rebuildImportedMonthHistory(data, ownerId);
+  // 1. Gravação protegida com lock transacional no JSON
+  updateUserData(ownerId, (data) => {
+    for (const record of validRecords) {
+      ensureCategory(data, record.category, ownerId);
+    }
+    const existingImports = Array.isArray(data.importHistory) ? data.importHistory : [];
+    const existingTransactions = Array.isArray(data.importedTransactions) ? data.importedTransactions : [];
 
+    data.importHistory = [importBatch, ...existingImports];
+    data.importedTransactions = [...existingTransactions, ...newTransactions];
+    rebuildImportedMonthHistory(data, ownerId);
+    return { data, result: true };
+  });
+
+  // 2. Sincronização SQLite com rollback cirúrgico caso falhe
   let syncedIncomes: string[] = [];
   try {
-    writeUserData(ownerId, data);
     syncedIncomes = syncIncomeToIrpf(ownerRecords, ownerId);
   } catch (error) {
+    // Reverter cirurgicamente apenas este lote e estas transações em data.json sem apagar alterações concorrentes
     try {
-      writeUserData(ownerId, backupData);
+      updateUserData(ownerId, (data) => {
+        data.importHistory = (Array.isArray(data.importHistory) ? data.importHistory : []).filter((batch: any) => batch.id !== importBatchId);
+        data.importedTransactions = (Array.isArray(data.importedTransactions) ? data.importedTransactions : []).filter((tx: any) => !newTransactionIds.has(tx.id));
+        rebuildImportedMonthHistory(data, ownerId);
+        return { data, result: true };
+      });
     } catch { /* ignore rollback write error */ }
+
+    // Reverter no SQLite apenas os IDs criados nesta importação
     for (const incomeId of syncedIncomes) {
       try { incomeRepository.delete(incomeId, ownerId); } catch { /* ignore rollback delete error */ }
     }

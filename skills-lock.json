@@ -1,59 +1,122 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
+    "api-security-testing": {
+      "source": "usestrix/strix",
+      "commit": "00912af5d179fda5e52961421f9061240a43676c",
+      "sourceType": "github",
+      "skillPath": "skills/api-security-testing/SKILL.md",
+      "computedHash": "32f365479f3446fff784b2ccc48b5115cd06e27be980de90824638779d78c48b"
+    },
+    "application-security-testing": {
+      "source": "usestrix/strix",
+      "commit": "00912af5d179fda5e52961421f9061240a43676c",
+      "sourceType": "github",
+      "skillPath": "skills/application-security-testing/SKILL.md",
+      "computedHash": "28c343b8c5cf3dd8daf7dda199d387761132b80f47648eb8aeb08502e158c446"
+    },
     "authorizing-api-requests": {
       "source": "mailtrap/mailtrap-skills",
       "sourceType": "github",
       "skillPath": "skills/authorizing-api-requests/SKILL.md",
-      "computedHash": "fd8a9bf77c6acdd7b6509f26e7d92f83b47cd73e340186d76579a424c246505c"
+      "computedHash": "a80d02ac3535635134d94a7eb59cb016c0866d0b71b88914c8071aea6d54922e"
+    },
+    "ci-security-scanning-with-strix": {
+      "source": "usestrix/strix",
+      "commit": "00912af5d179fda5e52961421f9061240a43676c",
+      "sourceType": "github",
+      "skillPath": "skills/ci-security-scanning-with-strix/SKILL.md",
+      "computedHash": "13949ab1e24f8cac87a11b221e55e52e6bfcf712ccd9eaeefeae4e3608c70d44"
     },
     "converting-email-templates": {
       "source": "mailtrap/mailtrap-skills",
       "sourceType": "github",
       "skillPath": "skills/converting-email-templates/SKILL.md",
-      "computedHash": "339e0af07d7474e1d18c9cea34b9efd530183c1b81af1f3dbcbc3c1995795d9b"
+      "computedHash": "530df149b7deea88bbfa4e44786c8e72428f19026d723a9c70ce6192963f6bab"
+    },
+    "find-security-vulnerabilities-in-code": {
+      "source": "usestrix/strix",
+      "commit": "00912af5d179fda5e52961421f9061240a43676c",
+      "sourceType": "github",
+      "skillPath": "skills/find-security-vulnerabilities-in-code/SKILL.md",
+      "computedHash": "d9ea567e93b8add3991b0c43c1b9f3ea604c6c53e0f88ef4bcec3be9e616efac"
+    },
+    "fix-security-vulnerabilities-with-strix": {
+      "source": "usestrix/strix",
+      "commit": "00912af5d179fda5e52961421f9061240a43676c",
+      "sourceType": "github",
+      "skillPath": "skills/fix-security-vulnerabilities-with-strix/SKILL.md",
+      "computedHash": "7febe815c271b39c688d583efef9a4f9674eaed063264f7218c7c67aacbd7abe"
     },
     "high-end-visual-design": {
       "source": "Leonxlnx/taste-skill-classics",
       "sourceType": "github",
       "skillPath": "skills/soft-skill/SKILL.md",
-      "computedHash": "6d03b1fc1798e13d0b5368b4a6135319503d6b9f39062ecfa0ddf8f6bc333508"
+      "computedHash": "35d686a6100bce47b3391e57ff69b3c5f77635728fafbd664109fbb6923f41f1"
+    },
+    "managed-pentesting-with-strix": {
+      "source": "usestrix/strix",
+      "commit": "00912af5d179fda5e52961421f9061240a43676c",
+      "sourceType": "github",
+      "skillPath": "skills/managed-pentesting-with-strix/SKILL.md",
+      "computedHash": "72ff2e9e61e426a08550196c260884ba43f7949f498c56ee896588d2792d8eb8"
     },
     "managing-contacts": {
       "source": "mailtrap/mailtrap-skills",
       "sourceType": "github",
       "skillPath": "skills/managing-contacts/SKILL.md",
-      "computedHash": "8095c2408b440debaa32fd268e398a275f0102eb4fad7fbb8f73d31aed5d0db5"
+      "computedHash": "a0da01e46c7172a56db653c0a2a774f6b5634eefcb9f50ae48c275e13f1693ae"
+    },
+    "owasp-top-10-testing": {
+      "source": "usestrix/strix",
+      "commit": "00912af5d179fda5e52961421f9061240a43676c",
+      "sourceType": "github",
+      "skillPath": "skills/owasp-top-10-testing/SKILL.md",
+      "computedHash": "dc3518dd62ce6b048dad7a969adfe88ea8e4d8bb8fd9c8a1627b443c8a508996"
+    },
+    "penetration-testing-with-strix": {
+      "source": "usestrix/strix",
+      "commit": "00912af5d179fda5e52961421f9061240a43676c",
+      "sourceType": "github",
+      "skillPath": "skills/penetration-testing-with-strix/SKILL.md",
+      "computedHash": "54ba2e5fabb69e319421fdf6c8bdbd43650b66d0ed592b920f57e60e25d9e809"
     },
     "receiving-emails": {
       "source": "mailtrap/mailtrap-skills",
       "sourceType": "github",
       "skillPath": "skills/receiving-emails/SKILL.md",
-      "computedHash": "312fdf86c30e572beccfe1723c38b7797d312c7f7475b9ea814daca29f80a26f"
+      "computedHash": "b4a9a67c78d901761634ec55bc33af4ce314a113f921e7da1bc2f85e34f130c2"
     },
     "sending-emails": {
       "source": "mailtrap/mailtrap-skills",
       "sourceType": "github",
       "skillPath": "skills/sending-emails/SKILL.md",
-      "computedHash": "2d06dc239af0ec65527578d0f7feccafd358e3f556bb0d165dac0ce15dc285b3"
+      "computedHash": "fb92510c370ede2e988fba1c57d3e24771b2bb2a9d7832ceaad0d3a9dc7d44c4"
     },
     "setting-up-sending-domain": {
       "source": "mailtrap/mailtrap-skills",
       "sourceType": "github",
       "skillPath": "skills/setting-up-sending-domain/SKILL.md",
-      "computedHash": "60e6a17677d7009b8518a3da58269eef1343066e9ba1d0943bb5371bbc5c62f2"
+      "computedHash": "62fc1ca2c01eed0fb4d7e27006ce90f00bba0539a6b5346287f3cd73e2f8e893"
     },
     "testing-with-sandbox": {
       "source": "mailtrap/mailtrap-skills",
       "sourceType": "github",
       "skillPath": "skills/testing-with-sandbox/SKILL.md",
-      "computedHash": "8baf20c20a1ca46c7054f9ceca640de601c0997ecb67b56c867580fe43f039b6"
+      "computedHash": "6a603f967aa548144dbf739de99e92ee96655f308136952a1139d5ebc0a92100"
     },
     "using-email-templates": {
       "source": "mailtrap/mailtrap-skills",
       "sourceType": "github",
       "skillPath": "skills/using-email-templates/SKILL.md",
-      "computedHash": "1950b9b39d7cbf14cbbee372617a39322a38a8c9d42cf258089c22b0ce056dd1"
+      "computedHash": "3a19cdd50959d90a147ed65c4faf2d276520ab30a582a32c7c15a2072d59706e"
+    },
+    "web-app-penetration-testing": {
+      "source": "usestrix/strix",
+      "commit": "00912af5d179fda5e52961421f9061240a43676c",
+      "sourceType": "github",
+      "skillPath": "skills/web-app-penetration-testing/SKILL.md",
+      "computedHash": "12d42989bda70f680c0c7b60aa8882f635d59aa7bc24e76eb78cbdf63085cba7"
     }
   }
 }

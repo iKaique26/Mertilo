@@ -12,6 +12,7 @@ const DATA_DIR = process.env.MERTILO_DATA_DIR
 const DATA_FILE = path.join(DATA_DIR, 'data.json');
 const LEGACY_DATA_FILE = process.env.MERTILO_LEGACY_DATA_FILE;
 const TEMP_DATA_FILE = `${DATA_FILE}.tmp`;
+const LOCK_FILE = `${DATA_FILE}.lock`;
 const OWNER_NAMESPACE_KEY = 'ownerData';
 
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -144,10 +145,97 @@ export function readUserData(userId: string | undefined): AppData {
   return normalizeData(normalizeOwnerData(raw[OWNER_NAMESPACE_KEY])[userId] || {});
 }
 
+function isProcessDead(pid: number): boolean {
+  if (!pid || pid <= 0) return true;
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error: any) {
+    return error?.code === 'ESRCH';
+  }
+}
+
+export function acquireFileLock(timeoutMs: number = 5000, staleTimeoutMs: number = 10000): () => void {
+  ensureDataFile();
+  const startTime = Date.now();
+
+  while (true) {
+    try {
+      const fd = fs.openSync(LOCK_FILE, 'wx');
+      const payload = JSON.stringify({ pid: process.pid, time: Date.now() });
+      fs.writeSync(fd, payload);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        try { fs.closeSync(fd); } catch { /* ignore close error */ }
+        try { if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE); } catch { /* ignore unlink error */ }
+      };
+    } catch (err: any) {
+      if (err?.code === 'EEXIST') {
+        let isStale = false;
+        try {
+          const content = fs.readFileSync(LOCK_FILE, 'utf8');
+          const data = JSON.parse(content);
+          const age = Date.now() - (Number(data.time) || 0);
+          if (age > staleTimeoutMs || isProcessDead(Number(data.pid))) {
+            isStale = true;
+          }
+        } catch {
+          // Arquivo corrompido ou inacessível momentaneamente
+          try {
+            const stat = fs.statSync(LOCK_FILE);
+            if (Date.now() - stat.mtimeMs > staleTimeoutMs) isStale = true;
+          } catch { /* ignore */ }
+        }
+
+        if (isStale) {
+          try {
+            fs.unlinkSync(LOCK_FILE);
+            continue;
+          } catch { /* outro processo pode ter removido */ }
+        }
+
+        if (Date.now() - startTime > timeoutMs) {
+          throw new Error(`Tempo limite atingido para obter lock de armazenamento (${timeoutMs}ms)`);
+        }
+
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+export function withStorageLock<T>(fn: () => T, timeoutMs: number = 5000): T {
+  const release = acquireFileLock(timeoutMs);
+  try {
+    return fn();
+  } finally {
+    release();
+  }
+}
+
+export function updateUserData<T>(userId: string | undefined, mutator: (current: AppData) => { data: AppData; result: T }): T {
+  if (!userId) throw new Error('Contexto de usuário obrigatório.');
+  return withStorageLock(() => {
+    const raw = readRawObject();
+    const owners = normalizeOwnerData(raw[OWNER_NAMESPACE_KEY]);
+    const current = normalizeData(owners[userId] || {});
+    const { data: updated, result } = mutator(current);
+    owners[userId] = normalizeData(updated);
+    writeRawObject({ ...raw, [OWNER_NAMESPACE_KEY]: owners });
+    return result;
+  });
+}
+
 export function writeUserData(userId: string | undefined, data: AppData): void {
   if (!userId) throw new Error('Contexto de usuário obrigatório.');
-  const raw = readRawObject();
-  const owners = normalizeOwnerData(raw[OWNER_NAMESPACE_KEY]);
-  owners[userId] = normalizeData(data);
-  writeRawObject({ ...raw, [OWNER_NAMESPACE_KEY]: owners });
+  withStorageLock(() => {
+    const raw = readRawObject();
+    const owners = normalizeOwnerData(raw[OWNER_NAMESPACE_KEY]);
+    owners[userId] = normalizeData(data);
+    writeRawObject({ ...raw, [OWNER_NAMESPACE_KEY]: owners });
+  });
 }
