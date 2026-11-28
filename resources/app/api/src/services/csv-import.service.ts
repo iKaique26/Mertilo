@@ -1,8 +1,10 @@
+﻿import { randomUUID } from 'node:crypto';
 import { readUserData, updateUserData, withStorageLock, writeUserData } from '../data/store.js';
-import { detectEncoding, detectDelimiter, detectHeaderRow, detectDateFormat, parseMonetary } from '../utils/csvDetection.js';
+import { detectEncoding, detectHeaderRow, detectDateFormat, parseMonetary } from '../utils/csvDetection.js';
 import { exercisesRepository } from '../modules/irpf/repositories/exercise.repository.js';
 import { incomeRepository } from '../modules/irpf/repositories/income.repository.js';
 import { getDatabase } from '../database/db.js';
+import type { ImportCompensationRecord } from '../types.js';
 
 export function sanitizeCsvFormula(value: string | null | undefined): string {
   if (value === null || value === undefined) return '';
@@ -28,7 +30,36 @@ export function exportCsvRow(fields: Array<string | number | null | undefined>):
     .join(';');
 }
 
-function syncIncomeToIrpf(records: ImportRecord[], userId: string): string[] {
+class SqliteSyncError extends Error {
+  causeError: unknown;
+  createdIncomeIds: string[];
+  exerciseIdsCreatedBySync: string[];
+
+  constructor(causeError: unknown, createdIncomeIds: string[], exerciseIdsCreatedBySync: string[]) {
+    super(causeError instanceof Error ? causeError.message : String(causeError));
+    this.name = 'SqliteSyncError';
+    this.causeError = causeError;
+    this.createdIncomeIds = createdIncomeIds;
+    this.exerciseIdsCreatedBySync = exerciseIdsCreatedBySync;
+  }
+}
+
+export class IncompleteImportCompensationError extends Error {
+  compensationIncomplete = true;
+  batchId: string;
+  pendingIncomeIds: string[];
+  pendingExerciseIds: string[];
+
+  constructor(message: string, batchId: string, pendingIncomeIds: string[], pendingExerciseIds: string[]) {
+    super(message);
+    this.name = 'IncompleteImportCompensationError';
+    this.batchId = batchId;
+    this.pendingIncomeIds = pendingIncomeIds;
+    this.pendingExerciseIds = pendingExerciseIds;
+  }
+}
+
+function syncIncomeToIrpf(records: ImportRecord[], userId: string): { createdIncomeIds: string[]; exerciseIdsCreatedBySync: string[] } {
   const createdIncomeIds: string[] = [];
   const exerciseIdsCreatedBySync: string[] = [];
   try {
@@ -61,21 +92,61 @@ function syncIncomeToIrpf(records: ImportRecord[], userId: string): string[] {
       });
       createdIncomeIds.push(created.id);
     }
-    return createdIncomeIds;
+    return { createdIncomeIds, exerciseIdsCreatedBySync };
   } catch (syncError) {
-    for (const incomeId of createdIncomeIds) {
-      try { incomeRepository.delete(incomeId, userId); } catch { /* ignore rollback error */ }
-    }
-    for (const exerciseId of exerciseIdsCreatedBySync) {
-      try {
-        const remainingIncomes = incomeRepository.getAll(exerciseId, userId);
-        if (remainingIncomes.length === 0) {
-          exercisesRepository.delete(exerciseId, userId);
-        }
-      } catch { /* ignore rollback error */ }
-    }
-    throw syncError;
+    throw new SqliteSyncError(syncError, createdIncomeIds, exerciseIdsCreatedBySync);
   }
+}
+
+function compensateSqliteBatch(
+  userId: string,
+  incomeIds: string[],
+  exerciseIds: string[]
+): {
+  deletedIncomeIds: string[];
+  pendingIncomeIds: string[];
+  deletedExerciseIds: string[];
+  pendingExerciseIds: string[];
+  errors: string[];
+} {
+  const deletedIncomeIds: string[] = [];
+  const pendingIncomeIds: string[] = [];
+  const deletedExerciseIds: string[] = [];
+  const pendingExerciseIds: string[] = [];
+  const errors: string[] = [];
+
+  for (const incomeId of incomeIds) {
+    try {
+      incomeRepository.delete(incomeId, userId);
+      deletedIncomeIds.push(incomeId);
+    } catch (err) {
+      pendingIncomeIds.push(incomeId);
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  for (const exerciseId of exerciseIds) {
+    try {
+      const remainingIncomes = incomeRepository.getAll(exerciseId, userId);
+      if (remainingIncomes.length === 0) {
+        exercisesRepository.delete(exerciseId, userId);
+        deletedExerciseIds.push(exerciseId);
+      } else if (pendingIncomeIds.length > 0) {
+        pendingExerciseIds.push(exerciseId);
+      }
+    } catch (err) {
+      pendingExerciseIds.push(exerciseId);
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return {
+    deletedIncomeIds,
+    pendingIncomeIds,
+    deletedExerciseIds,
+    pendingExerciseIds,
+    errors,
+  };
 }
 
 export type ImportDirection = 'entrada' | 'saída' | 'transferencia';
@@ -319,11 +390,15 @@ function detectDelimiter(content: string): string {
   return winner;
 }
 
-function parseCsvRows(content: string, delimiter: string): string[][] {
-  const rows: string[][] = [];
+interface CsvRow { row: string[]; line: number; }
+
+function parseCsvRows(content: string, delimiter: string): CsvRow[] {
+  const rows: CsvRow[] = [];
   let row: string[] = [];
   let buffer = '';
   let inQuotes = false;
+  let currentLine = 1;
+  let rowStartLine = 1;
 
   for (let i = 0; i < content.length; i += 1) {
     const char = content[i];
@@ -345,12 +420,23 @@ function parseCsvRows(content: string, delimiter: string): string[][] {
       continue;
     }
 
-    if ((char === '\n' || char === '\r') && !inQuotes) {
-      if (char === '\r' && next === '\n') i += 1;
-      row.push(buffer);
-      if (row.some((value) => value.trim() !== '')) rows.push(row);
-      row = [];
-      buffer = '';
+    const isLF = char === '\n';
+    const isCRLF = char === '\r' && next === '\n';
+    const isCR = char === '\r' && next !== '\n';
+
+    if (isLF || isCRLF || isCR) {
+      if (isCRLF) i += 1;
+      currentLine += 1;
+      if (!inQuotes) {
+        row.push(buffer);
+        if (row.some((value) => value.trim() !== '')) rows.push({ row, line: rowStartLine });
+        row = [];
+        buffer = '';
+        rowStartLine = currentLine;
+        continue;
+      }
+      buffer += char;
+      if (isCRLF) buffer += '\n';
       continue;
     }
 
@@ -359,7 +445,7 @@ function parseCsvRows(content: string, delimiter: string): string[][] {
 
   if (buffer.length > 0 || row.length > 0) {
     row.push(buffer);
-    if (row.some((value) => value.trim() !== '')) rows.push(row);
+    if (row.some((value) => value.trim() !== '')) rows.push({ row, line: rowStartLine });
   }
 
   return rows;
@@ -446,8 +532,8 @@ function getExistingImportedTransactions(userId: string): any[] {
 
 export function parseCsvPreview(rawCsv: string, options: { userId?: string; fileName?: string; mapping?: Partial<ImportColumnMapping>; existingRecords?: any[] } = {}): CsvImportPreview {
   const userId = requireUserId(options.userId);
-  const text = String(rawCsv || '').trim();
-  if (!text) {
+  const rawText = String(rawCsv || '');
+  if (!rawText.trim()) {
     return {
       headers: [],
       suggestedMapping: {},
@@ -456,10 +542,11 @@ export function parseCsvPreview(rawCsv: string, options: { userId?: string; file
       errors: [{ line: 1, message: 'Arquivo CSV vazio.' }],
     };
   }
+  const text = rawText.replace(/^\uFEFF/, '').trimEnd();
 
   const delimiter = detectDelimiter(text);
   const rows = parseCsvRows(text, delimiter);
-  const headerIdx = detectHeaderRow(rows);
+  const headerIdx = detectHeaderRow(rows.map((r) => r.row));
   if (headerIdx === -1 || rows.length < headerIdx + 2) {
     return {
       headers: [],
@@ -469,7 +556,7 @@ export function parseCsvPreview(rawCsv: string, options: { userId?: string; file
       errors: [{ line: 1, message: 'CSV sem cabeçalho ou sem linhas válidas.' }],
     };
   }
-  const rawHeaders = rows[headerIdx].map((header) => header.trim());
+  const rawHeaders = rows[headerIdx].row.map((header) => header.trim());
   const headers = rawHeaders.filter((_, index) => index < rawHeaders.length);
   const suggestedMapping = { ...buildSuggestedMapping(headers), ...(options.mapping || {}) };
   const allRecords: ImportRecord[] = [];
@@ -485,7 +572,7 @@ export function parseCsvPreview(rawCsv: string, options: { userId?: string; file
   }
 
   for (let i = headerIdx + 1; i < rows.length; i += 1) {
-    const row = rows[i];
+    const { row, line: physicalLine } = rows[i];
     const recordMap: Record<string, string> = {};
     for (let col = 0; col < headers.length; col += 1) {
       recordMap[headers[col]] = row[col] ?? '';
@@ -502,7 +589,7 @@ export function parseCsvPreview(rawCsv: string, options: { userId?: string; file
     const normalizedDescription = descriptionText || 'Movimentação sem descrição';
 
     if (!parsedDate || !normalizedDescription || value === null) {
-      errors.push({ line: lineNumber, message: 'Linha inválida: data, descrição ou valor não puderam ser identificados.' });
+      errors.push({ line: physicalLine, message: 'Linha inválida: data, descrição ou valor não puderam ser identificados.' });
       continue;
     }
 
@@ -544,7 +631,7 @@ export function parseCsvPreview(rawCsv: string, options: { userId?: string; file
       duplicateHash: hash,
       potentialDuplicate,
       manualReview: classification.status === 'revisao' || potentialDuplicate,
-      line: i + 1,
+      line: physicalLine,
       importSource: 'csv_import',
       importedAt: new Date().toISOString(),
     };
@@ -676,8 +763,112 @@ export function deleteImportedTransaction(userId: string | undefined, transactio
   });
 }
 
+export function getPendingImportCompensations(userId: string | undefined): ImportCompensationRecord[] {
+  const ownerId = requireUserId(userId);
+  const data = readUserData(ownerId);
+  return (Array.isArray(data.pendingCompensations) ? data.pendingCompensations : []).filter(
+    (entry) => entry.userId === ownerId
+  );
+}
+
+export interface CompensationRecoveryResult {
+  ok: boolean;
+  recoveredBatches: string[];
+  failedBatches: Array<{
+    batchId: string;
+    pendingIncomeIds: string[];
+    pendingExerciseIds: string[];
+    errors: string[];
+  }>;
+  remaining: number;
+}
+
+export function recoverPendingImportCompensations(userId: string | undefined, batchId?: string): CompensationRecoveryResult {
+  const ownerId = requireUserId(userId);
+  const initialData = readUserData(ownerId);
+  const targets = (Array.isArray(initialData.pendingCompensations) ? initialData.pendingCompensations : []).filter(
+    (entry) => entry.userId === ownerId && (!batchId || entry.batchId === batchId)
+  );
+
+  if (targets.length === 0) {
+    const remainingAll = (Array.isArray(initialData.pendingCompensations) ? initialData.pendingCompensations : []).length;
+    return { ok: true, recoveredBatches: [], failedBatches: [], remaining: remainingAll };
+  }
+
+  const recoveredBatches: string[] = [];
+  const failedBatches: CompensationRecoveryResult['failedBatches'] = [];
+
+  for (const target of targets) {
+    const result = compensateSqliteBatch(ownerId, target.pendingIncomeIds, target.pendingExerciseIds);
+    const stillPending = result.pendingIncomeIds.length > 0 || result.pendingExerciseIds.length > 0;
+    const now = new Date().toISOString();
+
+    updateUserData(ownerId, (latest) => {
+      const currentPending = Array.isArray(latest.pendingCompensations) ? latest.pendingCompensations : [];
+      if (!stillPending) {
+        const txIdSet = new Set(target.transactionIds);
+        latest.importHistory = (Array.isArray(latest.importHistory) ? latest.importHistory : []).filter(
+          (batch: any) => batch.id !== target.batchId
+        );
+        latest.importedTransactions = (Array.isArray(latest.importedTransactions) ? latest.importedTransactions : []).filter(
+          (tx: any) => !(txIdSet.has(tx.id) && tx.userId === ownerId)
+        );
+        latest.pendingCompensations = currentPending.filter((entry) => entry.batchId !== target.batchId);
+        rebuildImportedMonthHistory(latest, ownerId);
+      } else {
+        latest.pendingCompensations = currentPending.map((entry) =>
+          entry.batchId === target.batchId
+            ? {
+                ...entry,
+                pendingIncomeIds: result.pendingIncomeIds,
+                pendingExerciseIds: result.pendingExerciseIds,
+                attempts: entry.attempts + 1,
+                lastError: result.errors.join('; ') || entry.lastError,
+                updatedAt: now,
+              }
+            : entry
+        );
+      }
+      return { data: latest, result: true };
+    });
+
+    if (!stillPending) {
+      recoveredBatches.push(target.batchId);
+    } else {
+      failedBatches.push({
+        batchId: target.batchId,
+        pendingIncomeIds: result.pendingIncomeIds,
+        pendingExerciseIds: result.pendingExerciseIds,
+        errors: result.errors,
+      });
+    }
+  }
+
+  const remaining = getPendingImportCompensations(ownerId).length;
+  return {
+    ok: failedBatches.length === 0,
+    recoveredBatches,
+    failedBatches,
+    remaining,
+  };
+}
+
 export function undoCsvImport(userId: string | undefined, importId: string): { ok: boolean; revertedCount: number; importId?: string; reason?: string } {
   const ownerId = requireUserId(userId);
+  const pendingForBatch = getPendingImportCompensations(ownerId).find((entry) => entry.batchId === importId);
+  if (pendingForBatch) {
+    const recovery = recoverPendingImportCompensations(ownerId, importId);
+    if (!recovery.ok) {
+      return {
+        ok: false,
+        revertedCount: 0,
+        importId,
+        reason: 'Compensação SQLite pendente não pôde ser concluída.',
+      };
+    }
+    return { ok: true, revertedCount: pendingForBatch.transactionIds.length, importId };
+  }
+
   return updateUserData<{ ok: boolean; revertedCount: number; importId?: string; reason?: string }>(ownerId, (data) => {
     const currentImports = Array.isArray(data.importHistory) ? data.importHistory : [];
     const batch = currentImports.find((entry: any) => entry.id === importId && entry.userId === ownerId);
@@ -701,7 +892,7 @@ export function confirmCsvImport(payload: { userId?: string; records: ImportReco
   const validRecords = records.filter((record) => !record.potentialDuplicate && !record.manualReview && !!record.date && Number.isFinite(record.value));
 
   const ownerRecords = validRecords.map((record) => ({ ...record, userId: ownerId }));
-  const importBatchId = `import-${Date.now()}`;
+  const importBatchId = `import-${Date.now()}-${randomUUID().slice(0, 6)}`;
   const importBatch = {
     userId: ownerId,
     id: importBatchId,
@@ -739,26 +930,74 @@ export function confirmCsvImport(payload: { userId?: string; records: ImportReco
     return { data, result: true };
   });
 
-  // 2. Sincronização SQLite com rollback cirúrgico caso falhe
-  let syncedIncomes: string[] = [];
+  // 2. Sincronização SQLite com compensação cirúrgica e registro de estado caso falhe parcialmente
+  let createdIncomeIds: string[] = [];
+  let createdExerciseIds: string[] = [];
   try {
-    syncedIncomes = syncIncomeToIrpf(ownerRecords, ownerId);
+    const syncResult = syncIncomeToIrpf(ownerRecords, ownerId);
+    createdIncomeIds = syncResult.createdIncomeIds;
+    createdExerciseIds = syncResult.exerciseIdsCreatedBySync;
   } catch (error) {
-    // Reverter cirurgicamente apenas este lote e estas transações em data.json sem apagar alterações concorrentes
-    try {
+    if (error instanceof SqliteSyncError) {
+      createdIncomeIds = error.createdIncomeIds;
+      createdExerciseIds = error.exerciseIdsCreatedBySync;
+    }
+
+    const compensation = compensateSqliteBatch(ownerId, createdIncomeIds, createdExerciseIds);
+    const hasPendingCompensation = compensation.pendingIncomeIds.length > 0 || compensation.pendingExerciseIds.length > 0;
+    const rootCause = error instanceof SqliteSyncError ? error.causeError : error;
+
+    if (!hasPendingCompensation) {
       updateUserData(ownerId, (data) => {
         data.importHistory = (Array.isArray(data.importHistory) ? data.importHistory : []).filter((batch: any) => batch.id !== importBatchId);
         data.importedTransactions = (Array.isArray(data.importedTransactions) ? data.importedTransactions : []).filter((tx: any) => !newTransactionIds.has(tx.id));
+        if (Array.isArray(data.pendingCompensations)) {
+          data.pendingCompensations = data.pendingCompensations.filter((entry) => entry.batchId !== importBatchId);
+        }
         rebuildImportedMonthHistory(data, ownerId);
         return { data, result: true };
       });
-    } catch { /* ignore rollback write error */ }
-
-    // Reverter no SQLite apenas os IDs criados nesta importação
-    for (const incomeId of syncedIncomes) {
-      try { incomeRepository.delete(incomeId, ownerId); } catch { /* ignore rollback delete error */ }
+      throw rootCause;
     }
-    throw error;
+
+    const now = new Date().toISOString();
+    const rootMessage = rootCause instanceof Error ? rootCause.message : String(rootCause);
+    const errorDetail = compensation.errors.join('; ') || rootMessage;
+
+    updateUserData(ownerId, (data) => {
+      const existingImports = Array.isArray(data.importHistory) ? data.importHistory : [];
+      data.importHistory = existingImports.map((batch: any) =>
+        batch.id === importBatchId ? { ...batch, compensationStatus: 'incomplete' } : batch
+      );
+      data.importedTransactions = (Array.isArray(data.importedTransactions) ? data.importedTransactions : []).filter(
+        (tx: any) => !newTransactionIds.has(tx.id)
+      );
+      const existingPending = Array.isArray(data.pendingCompensations) ? data.pendingCompensations : [];
+      data.pendingCompensations = [
+        ...existingPending.filter((entry) => entry.batchId !== importBatchId),
+        {
+          batchId: importBatchId,
+          userId: ownerId,
+          status: 'compensation_incomplete',
+          pendingIncomeIds: compensation.pendingIncomeIds,
+          pendingExerciseIds: compensation.pendingExerciseIds,
+          transactionIds: Array.from(newTransactionIds),
+          attempts: 1,
+          lastError: errorDetail,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+      rebuildImportedMonthHistory(data, ownerId);
+      return { data, result: true };
+    });
+
+    throw new IncompleteImportCompensationError(
+      `${rootMessage} [compensação SQLite incompleta: lote ${importBatchId}; ${errorDetail}]`,
+      importBatchId,
+      compensation.pendingIncomeIds,
+      compensation.pendingExerciseIds
+    );
   }
 
   return {

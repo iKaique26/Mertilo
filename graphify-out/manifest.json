@@ -192,9 +192,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/data/store.ts": {
-    "mtime": 1793998516.5514739,
-    "seen": 1793998720.1431308,
-    "ast_hash": "c4ea476d7fc4d7be3616a9f58033ba3c",
+    "mtime": 1795876321.1618793,
+    "seen": 1795877193.5453575,
+    "ast_hash": "5455a8bbfa8dce6acd77b056d34cf736",
     "semantic_hash": ""
   },
   "resources/app/api/src/database/db.ts": {
@@ -444,9 +444,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/types.ts": {
-    "mtime": 1793992405.7351625,
-    "seen": 1793992456.241916,
-    "ast_hash": "e4d7d4dabf504db37e67aa9f4424fb16",
+    "mtime": 1795876310.464414,
+    "seen": 1795877193.553382,
+    "ast_hash": "59a694c71bf4eea1434666e00d7f37ad",
     "semantic_hash": ""
   },
   "resources/app/api/src/types/shims.d.ts": {
@@ -588,9 +588,9 @@
     "semantic_hash": ""
   },
   "resources/app/src/components/layout/Sidebar.jsx": {
-    "mtime": 1794008439.97728,
-    "seen": 1794171679.5137026,
-    "ast_hash": "db237fda6279a1ae9242429ba94e4817",
+    "mtime": 1795393934.7635112,
+    "seen": 1795877193.5566313,
+    "ast_hash": "aaf4b280a4da9d21cf7751646cc59b8a",
     "semantic_hash": ""
   },
   "resources/app/src/context/AuthContext.jsx": {
@@ -600,9 +600,9 @@
     "semantic_hash": ""
   },
   "resources/app/src/context/FinancialContext.tsx": {
-    "mtime": 1794002925.4793165,
-    "seen": 1794003010.1317904,
-    "ast_hash": "bad3235e6d6abae55278a3bd8aabc445",
+    "mtime": 1794965126.739304,
+    "seen": 1795877193.5567603,
+    "ast_hash": "d64217fcf811652cbb7543824d71fe5a",
     "semantic_hash": ""
   },
   "resources/app/src/hooks/useFinancial.ts": {
@@ -618,33 +618,33 @@
     "semantic_hash": ""
   },
   "resources/app/src/main.test.jsx": {
-    "mtime": 1794886812.6199996,
-    "seen": 1794886914.5862126,
-    "ast_hash": "8a1550acbd6fbbbf467e425cdf30d34d",
+    "mtime": 1795876904.1644003,
+    "seen": 1795877193.5571475,
+    "ast_hash": "c0b5741626d6c2098e054668cf68ae92",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Accounts/index.jsx": {
-    "mtime": 1794689866.184355,
-    "seen": 1794870072.2208946,
-    "ast_hash": "567c64550b0651baa2030c440170c91f",
+    "mtime": 1795048994.9531481,
+    "seen": 1795877193.559597,
+    "ast_hash": "94040541b1b2eb3f084426f6a508877d",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/ForgotPassword.jsx": {
-    "mtime": 1794689866.1853578,
-    "seen": 1794870072.2208967,
-    "ast_hash": "9626120a4c16a94fffd5f977ee1afb89",
+    "mtime": 1794973602.3190007,
+    "seen": 1795877193.559601,
+    "ast_hash": "5ecb1e3ded5aac16226643ae43415e9d",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/Login.jsx": {
-    "mtime": 1794689866.186355,
-    "seen": 1794870072.2208984,
-    "ast_hash": "d72556b01108d601918a6c8f92ca47aa",
+    "mtime": 1794973428.0913222,
+    "seen": 1795877193.5596044,
+    "ast_hash": "58db750467871738029bffe6a4d37380",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/Register.jsx": {
-    "mtime": 1794886712.5320914,
-    "seen": 1794886914.5883665,
-    "ast_hash": "f18d93bd9c26ccea7feb3c225178f013",
+    "mtime": 1794973563.9846845,
+    "seen": 1795877193.5596073,
+    "ast_hash": "7ff8beb1a0163d5bc661f1706258795e",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Auth/ResetPassword.jsx": {
@@ -660,9 +660,9 @@
     "semantic_hash": ""
   },
   "resources/app/src/pages/Categories/index.jsx": {
-    "mtime": 1794689866.190354,
-    "seen": 1794870072.2209046,
-    "ast_hash": "a57cddc6c87290af3537e52a5e937572",
+    "mtime": 1795049012.9348447,
+    "seen": 1795877193.560262,
+    "ast_hash": "cf4401d506578873470ce098e5b5ff80",
     "semantic_hash": ""
   },
   "resources/app/src/pages/Dashboard/index.jsx": {
@@ -684,9 +684,9 @@
     "semantic_hash": ""
   },
   "resources/app/src/services/api/financial.ts": {
-    "mtime": 1793877237.4313474,
-    "seen": 1793877259.186591,
-    "ast_hash": "cd6e2d748f362c0fad568f4196d4970e",
+    "mtime": 1794965126.739304,
+    "seen": 1795877193.5615237,
+    "ast_hash": "805a024d7e7a3455fe3aef2682259516",
     "semantic_hash": ""
   },
   "resources/app/src/theme/designSystem.js": {
@@ -798,27 +798,27 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/__tests__/csv-import.test.ts": {
-    "mtime": 1794712952.2039678,
-    "seen": 1794870072.2105944,
-    "ast_hash": "f7f04b839079cc870df107e301bb98da",
+    "mtime": 1795876901.8443449,
+    "seen": 1795877193.5408306,
+    "ast_hash": "c4fc6c67661f068abe2e73be4c02e010",
     "semantic_hash": ""
   },
   "resources/app/api/src/modules/financial-import.ts": {
-    "mtime": 1793992405.74116,
-    "seen": 1793992456.2380772,
-    "ast_hash": "6b08bb8c49db47f0e97607d4e6c29dc6",
+    "mtime": 1795388690.7855134,
+    "seen": 1795877193.547127,
+    "ast_hash": "f66c48b1689a95c1ebefcc601752424b",
     "semantic_hash": ""
   },
   "resources/app/api/src/services/csv-import.service.ts": {
-    "mtime": 1794008439.9757762,
-    "seen": 1794171679.510102,
-    "ast_hash": "6ab0d1ccbd1d9f0765e0a30daa20113a",
+    "mtime": 1795876497.134503,
+    "seen": 1795877193.5514631,
+    "ast_hash": "d6c267875af515ba79d35347f83c66a1",
     "semantic_hash": ""
   },
   "resources/app/src/pages/ImportacaoFinanceira/index.jsx": {
-    "mtime": 1794008439.97728,
-    "seen": 1794171679.515712,
-    "ast_hash": "d935d888b745e46247ce58207895093f",
+    "mtime": 1795574808.6101928,
+    "seen": 1795877193.5605335,
+    "ast_hash": "79aeff9f3a7c527378c4f0c5bf3cf898",
     "semantic_hash": ""
   },
   "resources/app/src/services/api/importacao.ts": {
@@ -930,9 +930,9 @@
     "semantic_hash": ""
   },
   "resources/app/src/types/index.ts": {
-    "mtime": 1794002925.4763167,
-    "seen": 1794003010.134777,
-    "ast_hash": "2252cf9e3309fd9f07a3ef38254584eb",
+    "mtime": 1794965126.739304,
+    "seen": 1795877193.5619082,
+    "ast_hash": "2870caf8a6b6065b77715efa8487fcdd",
     "semantic_hash": ""
   },
   "resources/app/api/src/modules/irpf/routes.ts": {
@@ -966,9 +966,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/modules/irpf/repositories/exercise.repository.ts": {
-    "mtime": 1793958952.5973074,
-    "seen": 1793959044.7050827,
-    "ast_hash": "de72075d7419b19d7f1bb347d215cc5c",
+    "mtime": 1795876336.1903298,
+    "seen": 1795877193.548806,
+    "ast_hash": "6dfb89ce2e64fa9cb0c96fc9fb3d35b1",
     "semantic_hash": ""
   },
   "resources/app/api/src/modules/irpf/repositories/documents.repository.ts": {
@@ -978,9 +978,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/src/modules/irpf/repositories/income.repository.ts": {
-    "mtime": 1793958952.5973074,
-    "seen": 1793959044.7050843,
-    "ast_hash": "a30cdea9d96c446f785401ed027528ef",
+    "mtime": 1795876335.3607323,
+    "seen": 1795877193.5488179,
+    "ast_hash": "12639569d0b3b32da816a3fc64976fb0",
     "semantic_hash": ""
   },
   "resources/app/api/src/modules/irpf/repositories/assets.repository.ts": {
@@ -1044,9 +1044,9 @@
     "semantic_hash": ""
   },
   "skills-lock.json": {
-    "mtime": 1794018406.0827863,
-    "seen": 1794171679.5164387,
-    "ast_hash": "9d3d0716b5f6d5a0628647b3a3f0975e",
+    "mtime": 1795389789.4382248,
+    "seen": 1795877193.5623822,
+    "ast_hash": "190a3a59d249ba7b05238d98f4ca7b92",
     "semantic_hash": ""
   },
   ".agents/skills/high-end-visual-design/SKILL.md": {
@@ -1410,9 +1410,9 @@
     "semantic_hash": ""
   },
   "resources/app/shared/legal-documents.json": {
-    "mtime": 1794689866.7199638,
-    "seen": 1794870072.2188869,
-    "ast_hash": "b89f76915b557c65a389e2f003574bba",
+    "mtime": 1795448040.2462752,
+    "seen": 1795877193.5554423,
+    "ast_hash": "2b67e2d8c022f6cd1e70a3df281ac4e0",
     "semantic_hash": ""
   },
   "resources/app/src/components/Privacy/ConsentBanner.jsx": {
@@ -1452,9 +1452,9 @@
     "semantic_hash": ""
   },
   "resources/app/api/shared/legal-documents.json": {
-    "mtime": 1794689866.7199638,
-    "seen": 1794870072.2103078,
-    "ast_hash": "b89f76915b557c65a389e2f003574bba",
+    "mtime": 1795448040.2462752,
+    "seen": 1795877193.5397792,
+    "ast_hash": "2b67e2d8c022f6cd1e70a3df281ac4e0",
     "semantic_hash": ""
   },
   "resources/app/api/src/types/fetch.d.ts": {
@@ -1473,6 +1473,126 @@
     "mtime": 1794745136.1832962,
     "seen": 1794870072.2114298,
     "ast_hash": "4ff035f6d05f2cbe997908f4dca2de21",
+    "semantic_hash": ""
+  },
+  "resources/app/api/src/__tests__/csv-detection.test.ts": {
+    "mtime": 1795608907.0016623,
+    "seen": 1795877193.540827,
+    "ast_hash": "71a3962a6739f47f573c081e5a35834f",
+    "semantic_hash": ""
+  },
+  "resources/app/api/src/__tests__/v006-concurrency.test.ts": {
+    "mtime": 1795392584.640723,
+    "seen": 1795877193.543029,
+    "ast_hash": "38357b78a2a89b649552c95a7281f033",
+    "semantic_hash": ""
+  },
+  "resources/app/api/src/data/store.js": {
+    "mtime": 1795616231.371512,
+    "seen": 1795877193.5453532,
+    "ast_hash": "4bf92ec6da7dacba41e07be444074890",
+    "semantic_hash": ""
+  },
+  "resources/app/api/src/utils/csvDetection.ts": {
+    "mtime": 1795615913.6252446,
+    "seen": 1795877193.5536768,
+    "ast_hash": "24d7db24d9db8538df5f6136b1e7368a",
+    "semantic_hash": ""
+  },
+  "resources/app/src/components/common/ConfirmDialog.jsx": {
+    "mtime": 1794965126.7423081,
+    "seen": 1795877193.5559623,
+    "ast_hash": "d65d133aeeed2702f006f50f433d3a81",
+    "semantic_hash": ""
+  },
+  "resources/app/src/components/common/FormModal.jsx": {
+    "mtime": 1794965126.7413077,
+    "seen": 1795877193.555965,
+    "ast_hash": "a17548e5cc4e2f219a30ae32baf4bbf4",
+    "semantic_hash": ""
+  },
+  "resources/app/src/pages/ImportacaoFinanceira/ExportPanel.jsx": {
+    "mtime": 1795557592.7079146,
+    "seen": 1795877193.560529,
+    "ast_hash": "f413e4d24e045b6d34f5538ef99e0d8e",
+    "semantic_hash": ""
+  },
+  "resources/app/src/utils/csvExport.test.ts": {
+    "mtime": 1795555681.2798984,
+    "seen": 1795877193.5619118,
+    "ast_hash": "73c295602c5ea6caf25b6dac88fbb3cf",
+    "semantic_hash": ""
+  },
+  "resources/app/src/utils/csvExport.ts": {
+    "mtime": 1795875877.6423166,
+    "seen": 1795877193.5619142,
+    "ast_hash": "6bdce92b26940dd4eb49ddbe5e6e7e35",
+    "semantic_hash": ""
+  },
+  ".agents/skills/api-security-testing/SKILL.md": {
+    "mtime": 1795389597.9252756,
+    "seen": 1795877193.5625184,
+    "ast_hash": "31afad6c8135f0f65eb14b650718c355",
+    "semantic_hash": ""
+  },
+  ".agents/skills/application-security-testing/SKILL.md": {
+    "mtime": 1795389597.9262762,
+    "seen": 1795877193.5625205,
+    "ast_hash": "44669d8984048037082a0e28d1116c16",
+    "semantic_hash": ""
+  },
+  ".agents/skills/ci-security-scanning-with-strix/SKILL.md": {
+    "mtime": 1795389597.9272754,
+    "seen": 1795877193.5626702,
+    "ast_hash": "1c81b3532535666100c1bd928de60f1a",
+    "semantic_hash": ""
+  },
+  ".agents/skills/find-security-vulnerabilities-in-code/SKILL.md": {
+    "mtime": 1795389597.9272754,
+    "seen": 1795877193.5642846,
+    "ast_hash": "eb7f4928d552fbcb6baa7099c9dd1da7",
+    "semantic_hash": ""
+  },
+  ".agents/skills/fix-security-vulnerabilities-with-strix/SKILL.md": {
+    "mtime": 1795389597.9272754,
+    "seen": 1795877193.5642874,
+    "ast_hash": "80682915e59c5232cb1bd4569dc63a9d",
+    "semantic_hash": ""
+  },
+  ".agents/skills/managed-pentesting-with-strix/SKILL.md": {
+    "mtime": 1795389597.9282756,
+    "seen": 1795877193.5644336,
+    "ast_hash": "7c782d9672a9e13343f8fc7d85579cb8",
+    "semantic_hash": ""
+  },
+  ".agents/skills/owasp-top-10-testing/SKILL.md": {
+    "mtime": 1795389597.9282756,
+    "seen": 1795877193.5645738,
+    "ast_hash": "ce716c1abf2a2eeafed9781a0ab042fb",
+    "semantic_hash": ""
+  },
+  ".agents/skills/penetration-testing-with-strix/SKILL.md": {
+    "mtime": 1795389597.9292755,
+    "seen": 1795877193.564576,
+    "ast_hash": "15c486849052a98900670a6a8d027f0f",
+    "semantic_hash": ""
+  },
+  ".agents/skills/web-app-penetration-testing/SKILL.md": {
+    "mtime": 1795389597.9292755,
+    "seen": 1795877193.565328,
+    "ast_hash": "35490286cd461b9ffe3c625c8fe0196e",
+    "semantic_hash": ""
+  },
+  ".github/agents/mertilo-core-engineer.agent.md": {
+    "mtime": 1795607887.68267,
+    "seen": 1795877193.5685346,
+    "ast_hash": "45e9ead797be9a1c9d261552b75f0ec3",
+    "semantic_hash": ""
+  },
+  "resources/app/icon-check.txt": {
+    "mtime": 1794964361.6112156,
+    "seen": 1795877193.5706375,
+    "ast_hash": "4f9788e2bdee762afcbc1f7fe58efc48",
     "semantic_hash": ""
   }
 }

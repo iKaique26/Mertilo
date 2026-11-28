@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getDatabase } from '../../../database/db.js';
 import type { IRPFExercise } from '../../../types.js';
 
@@ -5,7 +6,7 @@ export const exercisesRepository = {
   create(year: number, userId?: string): IRPFExercise {
     // legacy-compatible: allow passing user_id later; overload in service can set user_id
     const db = getDatabase();
-    const id = `exercise_${Date.now()}`;
+    const id = `exercise_${Date.now()}_${randomUUID().slice(0, 8)}`;
     const now = new Date().toISOString();
 
     const stmt = db.prepare(`

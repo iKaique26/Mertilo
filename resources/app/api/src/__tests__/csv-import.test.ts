@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,7 +12,17 @@ process.env.MERTILO_DATA_DIR = TEST_DIR;
 process.env.MERTILO_DB_PATH = path.join(TEST_DIR, 'mertilo.db');
 
 const { readUserData, writeUserData } = await import('../data/store.js');
-const { confirmCsvImport, parseCsvPreview, undoCsvImport, deleteImportedTransaction, sanitizeCsvFormula, exportCsvRow } = await import('../services/csv-import.service.js');
+const {
+  confirmCsvImport,
+  parseCsvPreview,
+  undoCsvImport,
+  deleteImportedTransaction,
+  sanitizeCsvFormula,
+  exportCsvRow,
+  getPendingImportCompensations,
+  recoverPendingImportCompensations,
+  IncompleteImportCompensationError,
+} = await import('../services/csv-import.service.js');
 const { exercisesRepository, documentsRepository, incomeRepository } = await import('../repositories/irpf.repository.js');
 const { irpfService } = await import('../services/irpf.service.js');
 const { initializeDatabase, shutdownDatabase } = await import('../database/index.js');
@@ -355,4 +365,258 @@ test('V-004 e V-006: isolamento estrito de usuário e atomicidade/rollback no im
   const revertedA = readUserData('user-a');
   assert.equal(revertedA.importedTransactions.length, previousA.importedTransactions.length);
   assert.equal(revertedA.importHistory.length, previousA.importHistory.length);
+});
+
+
+test('3.4B.6: rastreamento de linha fisica com registros multilinhas, vazios e cabecalho deslocado', () => {
+  // Fixture 3.4B.6:
+  // L1: preamble
+  // L2: (empty)
+  // L3: header
+  // L4-L6: record 1 (quoted field spanning L4-L6, 2 embedded LF)
+  // L7: record 2
+  // L8: (empty)
+  // L9: record 3
+  // L10: invalid record (bad date/value)
+    const csv = [
+      '123', // numeric preamble line
+      '', // empty line 2
+      'Data;Descricao;Valor', // header line 3
+      '01/08/2026;"Pagamento\nlinha dois\nlinha tres";-150,00', // record 1 spans lines 4-6
+      '02/08/2026;Uber;-45,90', // record 2 line 7
+      '', // empty line 8
+      '03/08/2026;Salario;5000,00', // record 3 line 9
+      'invalido;SEM_DATA_VALOR;abc', // invalid line 10
+    ].join('\n');
+
+  const result = parseCsvPreview(csv, { userId: 'user-a', fileName: 'fixture-346.csv' });
+
+  assert.equal(result.records.length, 3, `expected 3 records, got ${result.records.length}`);
+  assert.equal(result.records[0].line, 4, `record 0 expected line 4, got ${result.records[0].line}`);
+  assert.equal(result.records[1].line, 7, `record 1 expected line 7, got ${result.records[1].line}`);
+  assert.equal(result.records[2].line, 9, `record 2 expected line 9, got ${result.records[2].line}`);
+
+  assert.equal(result.errors.length, 1, `expected 1 error, got ${result.errors.length}`);
+  assert.equal(result.errors[0].line, 10, `invalid record expected error line 10, got ${result.errors[0].line}`);
+});
+
+test('3.4B.6 CRLF: mesmo comportamento com terminadores CRLF', () => {
+  const csv = [
+    '123',
+    '',
+    'Data;Descricao;Valor',
+    '01/08/2026;"Pagamento\nlinha dois\nlinha tres";-150,00',
+    '02/08/2026;Uber;-45,90',
+    '',
+    '03/08/2026;Salario;5000,00',
+  ].join('\r\n');
+
+  const result = parseCsvPreview(csv, { userId: 'user-a', fileName: 'fixture-346-crlf.csv' });
+
+  assert.equal(result.records.length, 3);
+  assert.equal(result.records[0].line, 4);
+  assert.equal(result.records[1].line, 7);
+  assert.equal(result.records[2].line, 9);
+});
+
+test('3.4B.8 parser CRLF interno/externo: CRLF conta uma unica quebra de linha sem duplicacao', () => {
+  const csv = [
+    '',
+    '123',
+    'Data;Descricao;Valor',
+    '01/08/2026;"Pagamento\r\nlinha dois\r\nlinha tres";-150,00',
+    '02/08/2026;Uber;-45,90',
+    '',
+    '03/08/2026;Salario;5000,00',
+    'invalido;SEM_DATA_VALOR;abc',
+  ].join('\r\n');
+
+  const result = parseCsvPreview(csv, { userId: 'user-a', fileName: 'fixture-348-crlf.csv' });
+
+  assert.equal(result.records.length, 3);
+  assert.equal(result.records[0].line, 4);
+  assert.equal(result.records[1].line, 7);
+  assert.equal(result.records[2].line, 9);
+  assert.equal(result.errors.length, 1);
+  assert.equal(result.errors[0].line, 10);
+});
+
+test('3.4B.8 rollback JSON+SQLite: falha parcial em DELETE registra compensacao pendente e recupera com idempotencia', () => {
+  const userId = 'user-348-recovery';
+  const preExercise = exercisesRepository.create(2030, userId);
+  const preIncome = incomeRepository.create(preExercise.id, {
+    exercise_id: preExercise.id,
+    income_type: 'salary',
+    description: 'Salario preexistente 2030',
+    amount: 4500,
+    month: 12,
+    source: 'manual',
+    confidence_score: 100,
+    is_verified: true,
+  });
+
+  const preExistingTx = {
+    userId,
+    id: 'pre-tx-1',
+    date: '2030-12-10',
+    description: 'Supermercado Preexistente',
+    normalizedDescription: 'supermercado preexistente',
+    originalDescription: 'Supermercado Preexistente',
+    value: -200,
+    type: 'saída' as const,
+    category: 'Alimentação',
+    subcategory: 'Supermercado',
+    confidence: 0.9,
+    source: 'pre.csv',
+    status: 'importado' as const,
+    line: 2,
+    importSource: 'csv_import',
+    importedAt: '2030-12-10T00:00:00.000Z',
+  };
+
+  writeUserData(userId, {
+    salario: 4500,
+    contas: [],
+    categorias: [],
+    historico: [],
+    vexpenses: [],
+    importHistory: [
+      {
+        userId,
+        id: 'pre-batch-1',
+        fileName: 'pre.csv',
+        importedAt: '2030-12-10T00:00:00.000Z',
+        summary: { total: 1, imported: 1, duplicates: 0, invalid: 0, toReview: 0 },
+        transactions: [preExistingTx],
+      },
+    ],
+    importedTransactions: [preExistingTx],
+  });
+
+  const batchRecords = [1, 2, 3, 4, 5].map((idx) => ({
+    userId,
+    id: `rec-348-${idx}`,
+    date: `2031-0${idx}-05`,
+    description: `Salario Mes ${idx}`,
+    normalizedDescription: `salario mes ${idx}`,
+    originalDescription: `Salario Mes ${idx}`,
+    value: 3000 + idx * 100,
+    type: 'entrada' as const,
+    category: 'Salário e outras receitas',
+    subcategory: 'Salário',
+    confidence: 0.95,
+    source: 'lote-348.csv',
+    status: 'importado' as const,
+    line: idx + 1,
+    importSource: 'csv_import',
+    importedAt: '2031-06-01T00:00:00.000Z',
+  }));
+
+  const origCreate = incomeRepository.create.bind(incomeRepository);
+  const origDelete = incomeRepository.delete.bind(incomeRepository);
+  let createCalls = 0;
+  let deleteCalls = 0;
+
+  (incomeRepository as any).create = (exerciseId: string, payload: any) => {
+    createCalls += 1;
+    if (createCalls === 5) {
+      throw new Error('Simulated SQLite failure on 5th transaction');
+    }
+    return origCreate(exerciseId, payload);
+  };
+
+  (incomeRepository as any).delete = (incomeId: string, ownerId?: string) => {
+    deleteCalls += 1;
+    if (deleteCalls >= 3) {
+      throw new Error(`Simulated partial DELETE failure for ${incomeId}`);
+    }
+    return origDelete(incomeId, ownerId);
+  };
+
+  let thrownError: any = null;
+  try {
+    confirmCsvImport({ userId, fileName: 'lote-348.csv', records: batchRecords });
+  } catch (err) {
+    thrownError = err;
+  } finally {
+    (incomeRepository as any).create = origCreate;
+    (incomeRepository as any).delete = origDelete;
+  }
+
+  assert.ok(thrownError instanceof IncompleteImportCompensationError);
+  assert.equal(thrownError.compensationIncomplete, true);
+  assert.equal(thrownError.pendingIncomeIds.length, 2);
+  assert.equal(thrownError.pendingExerciseIds.length, 1);
+
+  const pending = getPendingImportCompensations(userId);
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].batchId, thrownError.batchId);
+  assert.equal(pending[0].status, 'compensation_incomplete');
+  assert.equal(pending[0].pendingIncomeIds.length, 2);
+  assert.equal(pending[0].pendingExerciseIds.length, 1);
+  assert.equal(pending[0].attempts, 1);
+
+  // JSON nao fica incorretamente marcado como consistente
+  const midData = readUserData(userId);
+  assert.equal(midData.pendingCompensations?.length, 1);
+  const failedBatchEntry = midData.importHistory.find((entry) => entry.id === thrownError.batchId);
+  assert.ok(failedBatchEntry);
+  assert.equal(failedBatchEntry.compensationStatus, 'incomplete');
+
+  // Preexistentes em JSON permanecem intactos
+  assert.equal(midData.importedTransactions.length, 1);
+  assert.equal(midData.importedTransactions[0].id, 'pre-tx-1');
+  assert.ok(midData.importHistory.some((entry) => entry.id === 'pre-batch-1'));
+
+  // Preexistentes no SQLite permanecem intactos e orfaos do lote falho ainda existem
+  assert.ok(exercisesRepository.getById(preExercise.id, userId) !== null);
+  assert.ok(incomeRepository.getById(preIncome.id, userId) !== null);
+  const ex2031 = exercisesRepository.getByYear(2031, userId);
+  assert.ok(ex2031 !== null);
+  assert.equal(incomeRepository.getAll(ex2031.id, userId).length, 2);
+
+  // Tentar desfazer manualmente enquanto delete ainda falha nao apaga estado pendente
+  let retryDeleteCalls = 0;
+  (incomeRepository as any).delete = (incomeId: string, ownerId?: string) => {
+    retryDeleteCalls += 1;
+    if (retryDeleteCalls === 2) {
+      throw new Error('Second retry still failing on last item');
+    }
+    return origDelete(incomeId, ownerId);
+  };
+  try {
+    const partialRetry = recoverPendingImportCompensations(userId);
+    assert.equal(partialRetry.ok, false);
+    assert.equal(partialRetry.remaining, 1);
+    const afterPartial = getPendingImportCompensations(userId);
+    assert.equal(afterPartial[0].pendingIncomeIds.length, 1);
+    assert.equal(afterPartial[0].attempts, 2);
+  } finally {
+    (incomeRepository as any).delete = origDelete;
+  }
+
+  // Nova tentativa de recuperacao sem falhas conclui operacao com seguranca
+  const finalRecovery = recoverPendingImportCompensations(userId);
+  assert.equal(finalRecovery.ok, true);
+  assert.deepEqual(finalRecovery.recoveredBatches, [thrownError.batchId]);
+  assert.equal(finalRecovery.failedBatches.length, 0);
+  assert.equal(finalRecovery.remaining, 0);
+
+  // Idempotencia: segunda execucao sem pendencias nao gera erro nem efeitos colaterais
+  const idempotentRecovery = recoverPendingImportCompensations(userId);
+  assert.equal(idempotentRecovery.ok, true);
+  assert.equal(idempotentRecovery.recoveredBatches.length, 0);
+  assert.equal(idempotentRecovery.remaining, 0);
+
+  // Estado final limpo preservando preexistentes
+  const finalData = readUserData(userId);
+  assert.equal(finalData.pendingCompensations, undefined);
+  assert.equal(finalData.importHistory.length, 1);
+  assert.equal(finalData.importHistory[0].id, 'pre-batch-1');
+  assert.equal(finalData.importedTransactions.length, 1);
+  assert.equal(finalData.importedTransactions[0].id, 'pre-tx-1');
+
+  assert.equal(exercisesRepository.getByYear(2031, userId), null);
+  assert.ok(exercisesRepository.getById(preExercise.id, userId) !== null);
+  assert.ok(incomeRepository.getById(preIncome.id, userId) !== null);
 });

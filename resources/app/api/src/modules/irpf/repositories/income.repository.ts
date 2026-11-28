@@ -1,10 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { getDatabase } from '../../../database/db.js';
 import type { IRPFIncome } from '../../../types.js';
 
 export const incomeRepository = {
   create(exerciseId: string, data: Omit<IRPFIncome, 'id' | 'created_at' | 'updated_at'>): IRPFIncome {
     const db = getDatabase();
-    const id = `income_${Date.now()}`;
+    const id = `income_${Date.now()}_${randomUUID().slice(0, 8)}`;
     const now = new Date().toISOString();
 
     const stmt = db.prepare(`

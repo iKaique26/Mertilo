@@ -60,7 +60,7 @@ test('não quebra a UI do IRPF ao receber payload inválido da API', async () =>
 });
 
 test('o cabeçalho abre painel de filtros e configurações com interatividade real', async () => {
-  render(
+  const { container } = render(
     <MemoryRouter initialEntries={['/']}>
       <AuthContext.Provider value={{
         user: { id: '1', name: 'Maria Souza', email: 'maria@test.com' },
@@ -79,13 +79,14 @@ test('o cabeçalho abre painel de filtros e configurações com interatividade r
     </MemoryRouter>
   );
 
-  fireEvent.click(screen.getByRole('button', { name: /abrir filtros/i }));
-  expect(screen.getByText(/filtro por período/i)).toBeInTheDocument();
+  const view = within(container);
+  fireEvent.click(view.getByRole('button', { name: /abrir filtros/i }));
+  expect(view.getByText(/filtro por período/i)).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: /abrir configurações/i }));
-  expect(screen.getByText(/configurações da conta/i)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: /preferências de privacidade/i }));
-  expect(screen.getByRole('dialog', { name: /preferências de privacidade/i })).toBeInTheDocument();
+  fireEvent.click(view.getByRole('button', { name: /abrir configurações/i }));
+  expect(view.getByText(/configurações da conta/i)).toBeInTheDocument();
+  fireEvent.click(view.getByRole('button', { name: /preferências de privacidade/i }));
+  expect(view.getByRole('dialog', { name: /preferências de privacidade/i })).toBeInTheDocument();
 });
 
 test('a página de IRPF renderiza os links de navegação do exercício', async () => {

@@ -47,8 +47,7 @@ export function generateCsvContent(
   const headerLine = headers.map(formatCsvCell).join(delimiter);
   const dataLines = rows.map((row) => row.map(formatCsvCell).join(delimiter));
   // BOM UTF-8 para garantir abertura correta no Excel e programas locais
-  return '﻿' + [headerLine, ...dataLines].join('
-');
+  return '﻿' + [headerLine, ...dataLines].join('\n');
 }
 
 export function downloadCsvFile(content: string, filename: string): boolean {

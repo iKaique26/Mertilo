@@ -51,6 +51,9 @@ function normalizeData(value: Partial<AppData>): AppData {
     vexpenses: Array.isArray(value.vexpenses) ? value.vexpenses : defaults.vexpenses,
     importHistory: Array.isArray(value.importHistory) ? value.importHistory : defaults.importHistory,
     importedTransactions: Array.isArray(value.importedTransactions) ? value.importedTransactions : defaults.importedTransactions,
+    ...(Array.isArray(value.pendingCompensations) && value.pendingCompensations.length > 0
+      ? { pendingCompensations: value.pendingCompensations }
+      : {}),
   };
 }
 

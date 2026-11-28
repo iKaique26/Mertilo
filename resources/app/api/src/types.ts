@@ -64,11 +64,25 @@ export interface ImportedFinancialTransaction {
   importedAt: string;
 }
 
+export interface ImportCompensationRecord {
+  batchId: string;
+  userId: string;
+  status: 'compensation_incomplete';
+  pendingIncomeIds: string[];
+  pendingExerciseIds: string[];
+  transactionIds: string[];
+  attempts: number;
+  lastError: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface FinancialImportHistoryEntry {
   userId: string;
   id: string;
   fileName: string;
   importedAt: string;
+  compensationStatus?: 'incomplete';
   summary: {
     total: number;
     imported: number;
@@ -87,6 +101,7 @@ export interface AppData {
   vexpenses: VehicleExpense[];
   importHistory: FinancialImportHistoryEntry[];
   importedTransactions: ImportedFinancialTransaction[];
+  pendingCompensations?: ImportCompensationRecord[];
 }
 
 // ===== IRPF Types =====
